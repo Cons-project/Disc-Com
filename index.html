@@ -659,8 +659,8 @@ function getPerfiles(){return JSON.parse(localStorage.getItem('dc_perfiles')||'[
 function savePerfiles(p){localStorage.setItem('dc_perfiles',JSON.stringify(p));}
 function getConfig(){return JSON.parse(localStorage.getItem('dc_config')||'{}');}
 function saveConfig(c){localStorage.setItem('dc_config',JSON.stringify(c));}
-const toEmail=u=>u+'@disciplina.local';
-const toUser=e=>e.replace('@disciplina.local','');
+const toEmail=u=>u.toLowerCase()+'@disc-com.app';
+const toUser=e=>e.replace('@disc-com.app','');
 
 // ── Código de acceso ───────────────────────────────────────
 async function getCodeHash(){
