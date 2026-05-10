@@ -860,91 +860,12 @@ async function hasSuperAdmin(){
   return getPerfiles().some(p=>p.rol==='super_admin'&&p.activo);
 }
 
-// ── Restaurar sesión existente (Supabase persiste automático) ─
-async function checkExistingSession(){
-  if(!USE_SUPABASE||!SB)return false;
-  const {data:{session}}=await SB.auth.getSession();
-  if(!session)return false;
-  const {data:perfil}=await SB.from('perfiles').select('*').eq('id',session.user.id).single();
-  if(!perfil||!perfil.activo){await SB.auth.signOut();return false;}
-  SESSION={usuario:perfil.usuario,rol:perfil.rol,loggedIn:true,uid:session.user.id};
-  localStorage.setItem('dc_session',JSON.stringify(SESSION));
-  return true;
-}
 
-// ── Login ──────────────────────────────────────────────────
-async function dbLogin(usuario,password){
-  if(USE_SUPABASE&&SB){
-    const {data,error}=await SB.auth.signInWithPassword({email:toEmail(usuario),password});
-    if(error)return{ok:false,msg:'Usuario o contraseña incorrectos'};
-    const {data:perfil}=await SB.from('perfiles').select('*').eq('id',data.user.id).single();
-    if(!perfil)return{ok:false,msg:'Perfil no encontrado. Contacta al administrador.'};
-    if(!perfil.activo){await SB.auth.signOut();return{ok:false,msg:'Usuario desactivado. Contacta al administrador.'};}
-    return{ok:true,perfil};
-  }
-  // Demo: SHA-256
-  const h=await sha256(password);
-  const p=getPerfiles().find(p=>p.usuario===usuario);
-  if(!p)return{ok:false,msg:'Usuario no encontrado'};
-  if(!p.activo)return{ok:false,msg:'Usuario desactivado.'};
-  if(p.password_hash!==h)return{ok:false,msg:'Contraseña incorrecta'};
-  return{ok:true,perfil:p};
-}
-
-// ── Crear usuario ──────────────────────────────────────────
-async function dbCreateUser(usuario,password,rol){
-  if(USE_SUPABASE&&SB){
-    const {data,error}=await SB.auth.signUp({email:toEmail(usuario),password});
-    if(error)throw new Error(error.message==='User already registered'?'El usuario ya existe':error.message);
-    if(!data.user)throw new Error('No se pudo crear el usuario. Verifica que las confirmaciones de email estén desactivadas en Supabase.');
-    // Trigger auto-crea el perfil; actualizamos rol y usuario
-    await SB.from('perfiles').upsert({id:data.user.id,usuario,rol,activo:true},{onConflict:'id'});
-    return data.user;
-  }
-  const h=await sha256(password);
-  const perfiles=getPerfiles();
-  if(perfiles.find(p=>p.usuario===usuario))throw new Error('El usuario ya existe');
-  const np={id:'u'+Date.now(),usuario,password_hash:h,rol,activo:true,created_at:new Date().toISOString()};
-  perfiles.push(np);savePerfiles(perfiles);return np;
-}
-
-// ── Listar usuarios ────────────────────────────────────────
-async function dbGetUsers(){
-  if(USE_SUPABASE&&SB){
-    const {data}=await SB.from('perfiles').select('*').order('created_at',{ascending:false});
-    return data||[];
-  }
-  return getPerfiles();
-}
-
-// ── Activar / Desactivar ───────────────────────────────────
-async function dbToggleUser(id,activo){
-  if(USE_SUPABASE&&SB){await SB.from('perfiles').update({activo}).eq('id',id);return;}
-  const p=getPerfiles();const u=p.find(u=>u.id===id);if(u){u.activo=activo;savePerfiles(p);}
-}
-
-// ── Eliminar usuario ───────────────────────────────────────
-async function dbDeleteUser(id){
-  if(USE_SUPABASE&&SB){
-    // Elimina el perfil; el usuario en auth.users debe eliminarse desde el Dashboard
-    await SB.from('perfiles').delete().eq('id',id);
-    return;
-  }
-  savePerfiles(getPerfiles().filter(p=>p.id!==id));
-}
 
 // ── Reset contraseña ───────────────────────────────────────
 async function dbResetPass(id,newPass){
-  if(USE_SUPABASE&&SB){
-    // Solo posible para el usuario actual con anon key
-    if(SESSION?.uid===id){
-      const {error}=await SB.auth.updateUser({password:newPass});
-      if(error)throw new Error(error.message);
-      return;
-    }
-    throw new Error('_DASHBOARD_'); // señal para mostrar instrucciones
-  }
   const h=await sha256(newPass);
+  if(USE_SUPABASE&&SB){await SB.from('perfiles').update({password_hash:h}).eq('id',id);return;}
   const p=getPerfiles();const u=p.find(u=>u.id===id);if(u){u.password_hash=h;savePerfiles(p);}
 }
 
@@ -1578,9 +1499,7 @@ async function doResetPass(id,usuario){
     document.getElementById('m-reset-pass').textContent=np;
     document.getElementById('m-reset').classList.add('open');
   }catch(e){
-    if(e.message==='_DASHBOARD_'){
-      alert('Para resetear la contraseña de "'+usuario+'":\n\n1. Ve a supabase.com → tu proyecto\n2. Authentication → Users\n3. Busca al usuario por su email ('+usuario+'@disciplina.local)\n4. Clic en los tres puntos "..." → Send password recovery\n   o edita la contraseña directamente.');
-    }else{alert('Error: '+e.message);}
+    alert('Error al resetear: '+e.message);
   }
 }
 
