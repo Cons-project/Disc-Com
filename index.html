@@ -530,8 +530,8 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFAF8;}
 <script>
 // ── CONFIG ─────────────────────────────────────────────────
 const USE_SUPABASE = true; // → cambiar a true y poner credenciales para producción
-const SUPABASE_URL = 'https://dujxlwdwqovtwcmfbgqq.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR1anhsd2R3cW92dHdjbWZiZ3FxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0MjU5NDcsImV4cCI6MjA5NDAwMTk0N30.fDQA5a6gzG5cbZ9oFQRNUkRamSvLx2KCgz6hfpxG_gw';
+const SUPABASE_URL = 'https://qdqztmaupkfruhrkadpb.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcXp0bWF1cGtmcnVocmthZHBiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzNjA1NjIsImV4cCI6MjA5MTkzNjU2Mn0.9rrLL-uNa1bC462rCYFqfmPjXXNbjlDL8noy85zdkMs';
 const DEFAULT_CODE = 'D1sc1pl1na2025!';
 const MN=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 const CC=['#1A7A52','#1A4A8A','#8A5C00','#8A1A1A','#4A2A8A','#D4537E'];
@@ -1512,8 +1512,13 @@ function exportarExcel(){
   const ws2=XLSX.utils.aoa_to_sheet(acRows);
   ws2['!cols']=[{wch:28},{wch:20},{wch:12},{wch:16},{wch:16},{wch:36},{wch:36},{wch:30}];
   XLSX.utils.book_append_sheet(wb,'Acompañamiento',ws2);
-  const now=new Date();const fn='Disciplina_Comercial_'+now.getFullYear()+String(now.getMonth()+1).padStart(2,'0')+'.xlsx';
-  XLSX.writeFile(wb,fn);
+  const now=new Date();const fn='DisciplinaComercial_'+now.getFullYear()+String(now.getMonth()+1).padStart(2,'0')+'.xlsx';
+  const wbout=XLSX.write(wb,{bookType:'xlsx',type:'array'});
+  const blob=new Blob([wbout],{type:'application/octet-stream'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=fn;
+  document.body.appendChild(a);a.click();
+  document.body.removeChild(a);URL.revokeObjectURL(url);
 }
 
 // ── CARGA MASIVA EJECUTIVOS ─────────────────────────────────
