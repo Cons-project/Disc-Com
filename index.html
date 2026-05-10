@@ -665,8 +665,10 @@ const toUser=e=>e.replace('@disciplina.local','');
 // ── Código de acceso ───────────────────────────────────────
 async function getCodeHash(){
   if(USE_SUPABASE&&SB){
-    const {data}=await SB.from('config').select('valor').eq('clave','codigo_acceso_hash').single();
-    return data?.valor||null;
+    try{
+      const {data}=await SB.from('config').select('valor').eq('clave','codigo_acceso_hash').single();
+      return data?.valor||(await sha256(DEFAULT_CODE));
+    }catch{return await sha256(DEFAULT_CODE);}
   }
   const cfg=getConfig();
   return cfg.codigo_acceso_hash||(await sha256(DEFAULT_CODE));
