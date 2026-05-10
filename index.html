@@ -530,8 +530,8 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFAF8;}
 <script>
 // ── CONFIG ─────────────────────────────────────────────────
 const USE_SUPABASE = true; // → cambiar a true y poner credenciales para producción
-const SUPABASE_URL = 'https://dujxlwdwqovtwcmfbgqq.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR1anhsd2R3cW92dHdjbWZiZ3FxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0MjU5NDcsImV4cCI6MjA5NDAwMTk0N30.fDQA5a6gzG5cbZ9oFQRNUkRamSvLx2KCgz6hfpxG_gw';
+const SUPABASE_URL = 'https://qdqztmaupkfruhrkadpb.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcXp0bWF1cGtmcnVocmthZHBiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzNjA1NjIsImV4cCI6MjA5MTkzNjU2Mn0.9rrLL-uNa1bC462rCYFqfmPjXXNbjlDL8noy85zdkMs';
 const DEFAULT_CODE = 'D1sc1pl1na2025!';
 const MN=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 const CC=['#1A7A52','#1A4A8A','#8A5C00','#8A1A1A','#4A2A8A','#D4537E'];
@@ -650,23 +650,195 @@ function showScr(id){
 
 // ══════════════════════════════════════════════════════════
 // ══════════════════════════════════════════════════════════
-// AUTH — SUPABASE AUTH (Prod) / localStorage (Demo)
-// Email interno: usuario@disciplina.local
+// AUTH — SHA-256 (perfiles en Supabase, sin Supabase Auth)
 // ══════════════════════════════════════════════════════════
 
-// Demo fallback helpers
 function getPerfiles(){return JSON.parse(localStorage.getItem('dc_perfiles')||'[]');}
 function savePerfiles(p){localStorage.setItem('dc_perfiles',JSON.stringify(p));}
 function getConfig(){return JSON.parse(localStorage.getItem('dc_config')||'{}');}
 function saveConfig(c){localStorage.setItem('dc_config',JSON.stringify(c));}
-const toEmail=u=>u+'@disciplina.local';
-const toUser=e=>e.replace('@disciplina.local','');
+
+async function getCodeHash(){
+  if(USE_SUPABASE&&SB){
+    try{
+      const {data}=await SB.from('config').select('valor').eq('clave','codigo_acceso_hash').single();
+      return data?.valor||(await sha256(DEFAULT_CODE));
+    }catch{return await sha256(DEFAULT_CODE);}
+  }
+  const cfg=getConfig();
+  return cfg.codigo_acceso_hash||(await sha256(DEFAULT_CODE));
+}
+
+async function hasSuperAdmin(){
+  if(USE_SUPABASE&&SB){
+    const {data}=await SB.from('perfiles').select('id').eq('rol','super_admin').eq('activo',true).limit(1);
+    return !!(data&&data.length);
+  }
+  return getPerfiles().some(p=>p.rol==='super_admin'&&p.activo);
+}
+
+async function dbLogin(usuario,password){
+  const h=await sha256(password);
+  if(USE_SUPABASE&&SB){
+    const {data,error}=await SB.from('perfiles').select('*').eq('usuario',usuario).single();
+    if(error||!data)return{ok:false,msg:'Usuario no encontrado'};
+    if(!data.activo)return{ok:false,msg:'Usuario desactivado. Contacta al administrador.'};
+    if(data.password_hash!==h)return{ok:false,msg:'Contraseña incorrecta'};
+    return{ok:true,perfil:data};
+  }
+  const p=getPerfiles().find(p=>p.usuario===usuario);
+  if(!p)return{ok:false,msg:'Usuario no encontrado'};
+  if(!p.activo)return{ok:false,msg:'Usuario desactivado.'};
+  if(p.password_hash!==h)return{ok:false,msg:'Contraseña incorrecta'};
+  return{ok:true,perfil:p};
+}
+
+async function dbCreateUser(usuario,password,rol){
+  const h=await sha256(password);
+  const now=new Date().toISOString();
+  if(USE_SUPABASE&&SB){
+    const {data,error}=await SB.from('perfiles').insert({usuario,password_hash:h,rol,activo:true,created_at:now}).select('id').single();
+    if(error)throw new Error(error.message);
+    return data;
+  }
+  const perfiles=getPerfiles();
+  if(perfiles.find(p=>p.usuario===usuario))throw new Error('El usuario ya existe');
+  const np={id:'u'+Date.now(),usuario,password_hash:h,rol,activo:true,created_at:now};
+  perfiles.push(np);savePerfiles(perfiles);return np;
+}
+
+async function dbGetUsers(){
+  if(USE_SUPABASE&&SB){
+    const {data}=await SB.from('perfiles').select('*').order('created_at',{ascending:false});
+    return data||[];
+  }
+  return getPerfiles();
+}
+
+async function dbToggleUser(id,activo){
+  if(USE_SUPABASE&&SB){await SB.from('perfiles').update({activo}).eq('id',id);return;}
+  const p=getPerfiles();const u=p.find(u=>u.id===id);if(u){u.activo=activo;savePerfiles(p);}
+}
+
+async function dbDeleteUser(id){
+  if(USE_SUPABASE&&SB){await SB.from('perfiles').delete().eq('id',id);return;}
+  savePerfiles(getPerfiles().filter(p=>p.id!==id));
+}
+
+async function dbResetPass(id,newPass){
+  const h=await sha256(newPass);
+  if(USE_SUPABASE&&SB){await SB.from('perfiles').update({password_hash:h}).eq('id',id);return;}
+  const p=getPerfiles();const u=p.find(u=>u.id===id);if(u){u.password_hash=h;savePerfiles(p);}
+}
+
+async function dbSetCode(newCode){
+  const h=await sha256(newCode);
+  if(USE_SUPABASE&&SB){
+    await SB.from('config').upsert({clave:'codigo_acceso_hash',valor:h,updated_at:new Date().toISOString()});return;
+  }
+  const cfg=getConfig();cfg.codigo_acceso_hash=h;saveConfig(cfg);
+}
+
+// ══════════════════════════════════════════════════════════
+// AUTH FLOW
+// ══════════════════════════════════════════════════════════
+
+async function doUnlock(){
+  const code=document.getElementById('ue-code').value;if(!code)return;
+  document.getElementById('ue-loading').style.display='block';
+  try{
+    const expected=await getCodeHash();
+    const input=await sha256(code);
+    if(input!==expected){
+      document.getElementById('ue-loading').style.display='none';
+      authErr('ue-err','Código incorrecto. Intenta nuevamente.');
+      document.getElementById('ue-code').value='';return;
+    }
+    document.getElementById('ue-loading').style.display='none';
+    const hasSA=await hasSuperAdmin();
+    showScr(hasSA?'scr-login':'scr-setup');
+  }catch(e){
+    document.getElementById('ue-loading').style.display='none';
+    authErr('ue-err','Error de conexión. Intenta de nuevo.');
+  }
+}
+
+function validatePass(p){
+  if(p.length<12)return'Mínimo 12 caracteres';
+  if(!/[A-Z]/.test(p))return'Incluye al menos una mayúscula';
+  if(!/[0-9]/.test(p))return'Incluye al menos un número';
+  return null;
+}
+
+async function doSetup(){
+  const u=document.getElementById('su-user').value.trim();
+  const p=document.getElementById('su-pass').value;
+  const p2=document.getElementById('su-pass2').value;
+  if(!u){authErr('su-err','Ingresa un usuario');return;}
+  if(!/^[a-zA-Z0-9_\-@]+$/.test(u)){authErr('su-err','Solo letras, números, _ - @');return;}
+  const err=validatePass(p);if(err){authErr('su-err',err);return;}
+  if(p!==p2){authErr('su-err','Las contraseñas no coinciden');return;}
+  document.getElementById('su-loading').style.display='block';
+  try{
+    await dbCreateUser(u,p,'super_admin');
+    document.getElementById('su-loading').style.display='none';
+    showScr('scr-login');
+    const ok=document.getElementById('lg-ok');
+    ok.textContent='Administrador creado. Inicia sesión.';ok.classList.add('show');
+    document.getElementById('lg-user').value=u;
+  }catch(e){
+    document.getElementById('su-loading').style.display='none';
+    authErr('su-err',e.message||'Error al crear usuario');
+  }
+}
+
+async function doLogin(){
+  const u=document.getElementById('lg-user').value.trim();
+  const p=document.getElementById('lg-pass').value;
+  if(!u||!p){authErr('lg-err','Ingresa usuario y contraseña');return;}
+  document.getElementById('lg-loading').style.display='block';
+  try{
+    const res=await dbLogin(u,p);
+    document.getElementById('lg-loading').style.display='none';
+    if(!res.ok){authErr('lg-err',res.msg);document.getElementById('lg-pass').value='';return;}
+    SESSION={usuario:res.perfil.usuario,rol:res.perfil.rol,loggedIn:true};
+    localStorage.setItem('dc_session',JSON.stringify(SESSION));
+    initApp();
+  }catch(e){
+    document.getElementById('lg-loading').style.display='none';
+    authErr('lg-err','Error de conexión');
+  }
+}
+
+function doLogout(){
+  SESSION=null;localStorage.removeItem('dc_session');
+  document.getElementById('app').style.display='none';
+  document.getElementById('lg-pass').value='';
+  document.getElementById('lg-user').value='';
+  document.getElementById('ue-code').value='';
+  showScr('scr-unlock');
+}
+
+function initApp(){
+  document.getElementById('nu-name').textContent=SESSION.usuario;
+  const roleEl=document.getElementById('nu-role');
+  roleEl.textContent=SESSION.rol==='super_admin'?'Super Admin':'Evaluador';
+  roleEl.className='nu-role'+(SESSION.rol==='super_admin'?' sa':'');
+  document.getElementById('nb-usuarios').style.display=SESSION.rol==='super_admin'?'':'none';
+  showScr('app');
+  const _mes=new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0');
+  ['dm','emes','ofm'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=_mes;});
+  if(USE_SUPABASE&&SB)sbInit();
+  else{lES();rD();acInit();}
+}
 
 // ── Código de acceso ───────────────────────────────────────
 async function getCodeHash(){
   if(USE_SUPABASE&&SB){
-    const {data}=await SB.from('config').select('valor').eq('clave','codigo_acceso_hash').single();
-    return data?.valor||null;
+    try{
+      const {data}=await SB.from('config').select('valor').eq('clave','codigo_acceso_hash').single();
+      return data?.valor||(await sha256(DEFAULT_CODE));
+    }catch{return await sha256(DEFAULT_CODE);}
   }
   const cfg=getConfig();
   return cfg.codigo_acceso_hash||(await sha256(DEFAULT_CODE));
@@ -1512,8 +1684,13 @@ function exportarExcel(){
   const ws2=XLSX.utils.aoa_to_sheet(acRows);
   ws2['!cols']=[{wch:28},{wch:20},{wch:12},{wch:16},{wch:16},{wch:36},{wch:36},{wch:30}];
   XLSX.utils.book_append_sheet(wb,'Acompañamiento',ws2);
-  const now=new Date();const fn='Disciplina_Comercial_'+now.getFullYear()+String(now.getMonth()+1).padStart(2,'0')+'.xlsx';
-  XLSX.writeFile(wb,fn);
+  const now=new Date();const fn='DisciplinaComercial_'+now.getFullYear()+String(now.getMonth()+1).padStart(2,'0')+'.xlsx';
+  const wbout=XLSX.write(wb,{bookType:'xlsx',type:'array'});
+  const blob=new Blob([wbout],{type:'application/octet-stream'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=fn;
+  document.body.appendChild(a);a.click();
+  document.body.removeChild(a);URL.revokeObjectURL(url);
 }
 
 // ── CARGA MASIVA EJECUTIVOS ─────────────────────────────────
@@ -1566,15 +1743,7 @@ async function confirmarBulkEj(){
 // INIT
 // ══════════════════════════════════════════════════════════
 (async function init(){
-  if(USE_SUPABASE&&SB){
-    // Supabase maneja la sesión automáticamente
-    const restored=await checkExistingSession();
-    if(!restored)showScr('scr-unlock');
-  }else{
-    // Demo: leer del localStorage
-    if(SESSION&&SESSION.loggedIn){initApp();}
-    // else se queda en scr-unlock (ya visible por defecto)
-  }
+  if(SESSION&&SESSION.loggedIn){initApp();}
 })();
 </script>
 </body>
