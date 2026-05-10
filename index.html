@@ -1,0 +1,1581 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Disciplina Comercial</title>
+<script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#F5F4F0;--surface:#FFF;--s2:#EFEDE8;--bd:rgba(0,0,0,.08);--bd2:rgba(0,0,0,.14);--t:#1A1916;--t2:#6B6860;--t3:#9E9C97;--acc:#1A1916;--gn:#1A7A52;--gn2:#E8F5EE;--am:#8A5C00;--am2:#FDF3DC;--rd:#A52A2A;--rd2:#FAEAEA;--pu:#4A2A8A;--pu2:#F0EAFA;--r:12px;--rs:8px;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--t);font-size:14px;line-height:1.5;min-height:100vh;}
+
+/* ── AUTH SCREENS ─────────────────────────────────────────── */
+.auth-wrap{display:none;position:fixed;inset:0;background:#F5F4F0;z-index:999;align-items:center;justify-content:center;padding:20px;}
+.auth-wrap.show{display:flex;}
+.auth-card{background:#fff;border:1px solid var(--bd2);border-radius:16px;padding:40px 36px;width:100%;max-width:400px;box-shadow:0 4px 24px rgba(0,0,0,.08);}
+.auth-logo{font-size:18px;font-weight:600;letter-spacing:-.3px;margin-bottom:4px;}
+.auth-logo span{color:var(--t3);font-weight:400;}
+.auth-title{font-size:22px;font-weight:600;letter-spacing:-.4px;margin-bottom:6px;margin-top:24px;}
+.auth-sub{font-size:13px;color:var(--t2);margin-bottom:28px;}
+.auth-field{margin-bottom:16px;}
+.auth-label{font-size:12px;color:var(--t2);display:block;margin-bottom:6px;font-weight:500;}
+.auth-input{width:100%;padding:10px 14px;border:1px solid var(--bd2);border-radius:8px;font-family:inherit;font-size:14px;background:var(--bg);color:var(--t);outline:none;transition:border-color .15s;}
+.auth-input:focus{border-color:var(--t);}
+.auth-btn{width:100%;padding:11px;background:var(--acc);color:#fff;border:none;border-radius:8px;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;margin-top:8px;transition:background .15s;}
+.auth-btn:hover{background:#333;}
+.auth-err{background:var(--rd2);color:var(--rd);border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:16px;display:none;}
+.auth-err.show{display:block;}
+.auth-info{background:var(--am2);color:var(--am);border-radius:8px;padding:10px 14px;font-size:12px;margin-bottom:16px;}
+.auth-ok{background:var(--gn2);color:var(--gn);border-radius:8px;padding:10px 14px;font-size:12px;margin-bottom:16px;display:none;}
+.auth-ok.show{display:block;}
+.auth-loading{text-align:center;color:var(--t3);font-size:13px;padding:12px 0;}
+.pw-wrap{position:relative;}
+.pw-eye{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--t3);font-size:14px;padding:2px 4px;}
+
+/* ── MAIN NAV ─────────────────────────────────────────────── */
+.nav{background:var(--surface);border-bottom:1px solid var(--bd);padding:0 20px;display:flex;align-items:center;justify-content:space-between;height:52px;position:sticky;top:0;z-index:100;}
+.nb{font-size:15px;font-weight:600;letter-spacing:-.3px;flex-shrink:0;}.nb span{color:var(--t3);font-weight:400;}
+.nt{display:flex;gap:2px;overflow-x:auto;}
+.ntb{padding:5px 12px;border-radius:6px;border:none;background:transparent;color:var(--t2);font-family:inherit;font-size:13px;cursor:pointer;transition:all .15s;white-space:nowrap;}
+.ntb:hover{background:var(--s2);color:var(--t);}
+.ntb.active{background:var(--acc);color:#fff;}
+.nu{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.nu-name{font-size:12px;color:var(--t2);}
+.nu-role{font-size:10px;font-weight:600;padding:2px 6px;border-radius:4px;background:var(--s2);color:var(--t2);}
+.nu-role.sa{background:#1A1916;color:#fff;}
+.logout-btn{padding:5px 12px;border-radius:6px;border:1px solid var(--bd2);background:transparent;font-family:inherit;font-size:12px;color:var(--t2);cursor:pointer;}
+.logout-btn:hover{background:var(--rd2);color:var(--rd);border-color:var(--rd);}
+
+/* ── VIEWS ────────────────────────────────────────────────── */
+.vw{display:none;padding:24px 20px;max-width:1100px;margin:0 auto;}
+.vw.active{display:block;}
+.pt{font-size:22px;font-weight:600;letter-spacing:-.4px;margin-bottom:4px;}
+.ps{font-size:13px;color:var(--t2);margin-bottom:20px;}
+.sr{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:12px;margin-bottom:20px;}
+.sc{background:var(--surface);border:1px solid var(--bd);border-radius:var(--r);padding:16px 18px;}
+.sv{font-size:28px;font-weight:600;line-height:1;margin-bottom:4px;}.sl{font-size:12px;color:var(--t3);}
+.sc.g .sv{color:var(--gn);}.sc.a .sv{color:var(--am);}.sc.r .sv{color:var(--rd);}
+.rb{display:flex;align-items:center;gap:8px;margin-top:6px;}
+.rbt{flex:1;height:4px;background:var(--s2);border-radius:2px;overflow:hidden;}
+.rbf{height:100%;border-radius:2px;transition:width .4s;}
+.rp{font-size:11px;color:var(--t2);min-width:30px;text-align:right;font-family:'DM Mono',monospace;}
+.tw{background:var(--surface);border:1px solid var(--bd);border-radius:var(--r);overflow:hidden;}
+.th2{padding:12px 16px;border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+.tt{font-size:14px;font-weight:600;}
+.inp{padding:6px 12px;border:1px solid var(--bd2);border-radius:6px;font-family:inherit;font-size:13px;background:var(--bg);color:var(--t);outline:none;}
+.inp:focus{border-color:var(--t);}
+.sel{padding:6px 10px;border:1px solid var(--bd2);border-radius:6px;font-family:inherit;font-size:13px;background:var(--bg);color:var(--t);outline:none;cursor:pointer;}
+table{width:100%;border-collapse:collapse;}
+th{padding:9px 16px;text-align:left;font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--bd);background:var(--bg);}
+td{padding:10px 16px;border-bottom:1px solid var(--bd);font-size:13px;}
+tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFAF8;}
+.badge{display:inline-flex;align-items:center;font-size:11px;font-weight:500;padding:2px 8px;border-radius:20px;white-space:nowrap;}
+.bg{background:var(--gn2);color:var(--gn);}.ba{background:var(--am2);color:var(--am);}.br{background:var(--rd2);color:var(--rd);}.bgr{background:var(--s2);color:var(--t2);}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:6px;border:1px solid var(--bd2);background:transparent;font-family:inherit;font-size:13px;color:var(--t);cursor:pointer;transition:all .15s;}
+.btn:hover{background:var(--s2);}
+.btn-p{background:var(--acc);color:#fff;border-color:var(--acc);}.btn-p:hover{background:#333;border-color:#333;}
+.btn-sm{padding:4px 10px;font-size:12px;}
+.btn-danger{color:var(--rd);border-color:var(--rd);}.btn-danger:hover{background:var(--rd2);}
+.mov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:200;align-items:center;justify-content:center;padding:20px;}
+.mov.open{display:flex;}
+.mo{background:var(--surface);border-radius:var(--r);width:100%;max-width:520px;max-height:90vh;overflow-y:auto;}
+.mo-lg{max-width:720px;}
+.moh{padding:20px 24px 16px;border-bottom:1px solid var(--bd);display:flex;align-items:flex-start;justify-content:space-between;position:sticky;top:0;background:var(--surface);z-index:1;}
+.mot{font-size:16px;font-weight:600;}.mos{font-size:12px;color:var(--t2);margin-top:2px;}
+.mox{background:none;border:none;font-size:18px;cursor:pointer;color:var(--t2);padding:2px 6px;border-radius:4px;}.mox:hover{background:var(--s2);}
+.mob{padding:20px 24px;}.mof{padding:16px 24px;border-top:1px solid var(--bd);display:flex;justify-content:flex-end;gap:8px;}
+.cb{border:1px solid var(--bd);border-radius:var(--rs);margin-bottom:10px;overflow:hidden;}
+.ch{display:flex;align-items:center;gap:10px;padding:11px 14px;cursor:pointer;user-select:none;}
+.ch:hover{background:var(--bg);}
+.cpts{font-size:11px;font-weight:600;background:var(--s2);padding:2px 7px;border-radius:4px;color:var(--t2);font-family:'DM Mono',monospace;flex-shrink:0;}
+.cn{font-size:13px;font-weight:500;flex:1;}.csco{font-size:12px;font-weight:600;font-family:'DM Mono',monospace;}
+.ccv{font-size:10px;color:var(--t3);transition:transform .2s;}.ccv.open{transform:rotate(90deg);}
+.cbody{display:none;padding:0 14px 12px;}.cbody.open{display:block;}
+.er{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--bd);cursor:pointer;}
+.er:last-of-type{border-bottom:none;}
+.eck{width:16px;height:16px;border:1.5px solid var(--bd2);border-radius:4px;flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;transition:all .15s;}
+.eck.on{background:var(--gn);border-color:var(--gn);}.eck.on::after{content:'\2713';font-size:10px;color:#fff;font-weight:700;}
+.etxt{font-size:12px;color:var(--t2);flex:1;line-height:1.4;}
+.etag{font-size:10px;font-weight:500;padding:1px 6px;border-radius:20px;flex-shrink:0;margin-top:2px;}
+.etag.fija{background:var(--gn2);color:var(--gn);}.etag.rot{background:var(--pu2);color:var(--pu);}
+.epts{font-size:11px;color:var(--t3);flex-shrink:0;margin-top:2px;font-family:'DM Mono',monospace;}
+.bw{background:var(--bg);border-radius:var(--rs);padding:10px 12px;margin:4px 0 6px 26px;}
+.bh{font-size:11px;color:var(--t3);margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;}
+.bo{display:flex;align-items:flex-start;gap:8px;padding:5px 0;border-bottom:1px solid var(--bd);cursor:pointer;font-size:12px;color:var(--t2);}
+.bo:last-child{border-bottom:none;}.bo.sel{color:var(--t);font-weight:500;}
+.brd{font-size:11px;padding:2px 8px;border:1px solid var(--bd2);border-radius:4px;background:var(--surface);cursor:pointer;font-family:inherit;color:var(--t2);}
+.brd:hover{background:var(--s2);}
+.pb{height:3px;background:var(--s2);border-radius:2px;margin-top:10px;overflow:hidden;}
+.pf{height:100%;border-radius:2px;transition:width .3s;}
+.ss{background:var(--bg);border-radius:var(--rs);padding:14px 16px;margin-bottom:16px;display:flex;align-items:center;gap:20px;flex-wrap:wrap;}
+.sn{font-size:32px;font-weight:600;font-family:'DM Mono',monospace;line-height:1;}
+.mb{flex:1;min-width:180px;}
+.mr{display:flex;align-items:center;gap:8px;margin-bottom:4px;font-size:11px;color:var(--t2);}
+.ml{width:130px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.mt{flex:1;height:4px;background:var(--s2);border-radius:2px;overflow:hidden;}
+.mf{height:100%;border-radius:2px;transition:width .3s;}
+.mp{width:28px;text-align:right;font-family:'DM Mono',monospace;font-size:10px;}
+.ec{background:var(--surface);border:1px solid var(--bd);border-radius:var(--r);padding:18px;margin-bottom:12px;}
+.eh{display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap;}
+.en{font-size:15px;font-weight:600;flex:1;}.eof{font-size:12px;color:var(--t2);}
+.emo{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;}
+.em{display:flex;flex-direction:column;align-items:center;gap:4px;}
+.ebw{width:36px;height:80px;background:var(--bg);border-radius:4px;display:flex;align-items:flex-end;overflow:hidden;}
+.eb{width:100%;border-radius:4px 4px 0 0;}
+.ev{font-size:11px;font-weight:600;font-family:'DM Mono',monospace;}
+.em2{font-size:10px;color:var(--t3);}
+.oc{background:var(--surface);border:1px solid var(--bd);border-radius:var(--r);padding:18px;margin-bottom:12px;}
+.ab{background:var(--rd2);border:1px solid rgba(165,42,42,.2);border-radius:var(--rs);padding:10px 14px;margin-bottom:10px;font-size:12px;color:var(--rd);}
+.as{background:var(--surface);border:1px solid var(--bd);border-radius:var(--r);margin-bottom:16px;overflow:hidden;}
+.ash{padding:14px 18px;border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between;}
+.ast{font-size:14px;font-weight:600;}
+.ai{display:flex;align-items:center;gap:12px;padding:10px 18px;border-bottom:1px solid var(--bd);}
+.ai:last-child{border-bottom:none;}
+.ed{border:none;background:transparent;font-family:inherit;font-size:13px;color:var(--t);outline:none;flex:1;padding:2px 4px;border-radius:4px;}
+.ed:focus{background:var(--bg);}
+.empty{padding:40px;text-align:center;color:var(--t3);font-size:13px;}
+.fr{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:20px;}
+.chip{padding:5px 12px;border-radius:20px;border:1px solid var(--bd2);background:var(--surface);font-size:12px;cursor:pointer;color:var(--t2);transition:all .15s;font-family:inherit;}
+.chip.active{background:var(--acc);color:#fff;border-color:var(--acc);}
+/* user management */
+.usr-tag{font-size:10px;font-weight:600;padding:2px 7px;border-radius:20px;}
+.usr-tag.sa{background:#1A1916;color:#fff;}
+.usr-tag.ev{background:var(--pu2);color:var(--pu);}
+.usr-tag.off{background:var(--s2);color:var(--t3);}
+.pass-show{background:var(--gn2);border:1px solid rgba(26,122,82,.2);border-radius:8px;padding:14px 16px;font-family:'DM Mono',monospace;font-size:16px;letter-spacing:.1em;font-weight:500;color:var(--gn);text-align:center;cursor:pointer;user-select:all;}
+.pass-show-hint{font-size:11px;color:var(--t3);text-align:center;margin-top:6px;}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════════
+     SCREEN 0 — CÓDIGO DE ACCESO GLOBAL
+══════════════════════════════════════════════════════════ -->
+<div class="auth-wrap show" id="scr-unlock">
+  <div class="auth-card">
+    <div class="auth-logo">Disciplina <span>Comercial</span></div>
+    <div class="auth-title">Código de acceso</div>
+    <div class="auth-sub">Ingresa el código de acceso para continuar.</div>
+    <div class="auth-err" id="ue-err">Código incorrecto. Intenta nuevamente.</div>
+    <div class="auth-field">
+      <label class="auth-label">Código</label>
+      <div class="pw-wrap">
+        <input class="auth-input" type="password" id="ue-code" placeholder="••••••••••••" autocomplete="off"
+          onkeydown="if(event.key==='Enter')doUnlock()">
+        <button class="pw-eye" type="button" onclick="togglePw('ue-code',this)">👁</button>
+      </div>
+    </div>
+    <div class="auth-loading" id="ue-loading" style="display:none">Verificando...</div>
+    <button class="auth-btn" onclick="doUnlock()">Continuar →</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     SCREEN 1 — PRIMER ADMINISTRADOR
+══════════════════════════════════════════════════════════ -->
+<div class="auth-wrap" id="scr-setup">
+  <div class="auth-card">
+    <div class="auth-logo">Disciplina <span>Comercial</span></div>
+    <div class="auth-title">Primer acceso</div>
+    <div class="auth-sub">No hay administradores registrados. Crea el super administrador inicial.</div>
+    <div class="auth-info">Este usuario tendrá acceso total incluyendo gestión de usuarios.</div>
+    <div class="auth-err" id="su-err"></div>
+    <div class="auth-field">
+      <label class="auth-label">Usuario</label>
+      <input class="auth-input" type="text" id="su-user" placeholder="Ej: ADM1" autocomplete="off">
+    </div>
+    <div class="auth-field">
+      <label class="auth-label">Contraseña (mín. 12 caracteres)</label>
+      <div class="pw-wrap">
+        <input class="auth-input" type="password" id="su-pass" placeholder="Contraseña robusta..." autocomplete="new-password">
+        <button class="pw-eye" type="button" onclick="togglePw('su-pass',this)">👁</button>
+      </div>
+    </div>
+    <div class="auth-field">
+      <label class="auth-label">Confirmar contraseña</label>
+      <input class="auth-input" type="password" id="su-pass2" placeholder="Repite la contraseña"
+        onkeydown="if(event.key==='Enter')doSetup()">
+    </div>
+    <div class="auth-loading" id="su-loading" style="display:none">Creando administrador...</div>
+    <button class="auth-btn" onclick="doSetup()">Crear administrador</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     SCREEN 2 — LOGIN
+══════════════════════════════════════════════════════════ -->
+<div class="auth-wrap" id="scr-login">
+  <div class="auth-card">
+    <div class="auth-logo">Disciplina <span>Comercial</span></div>
+    <div class="auth-title">Iniciar sesión</div>
+    <div class="auth-sub">Ingresa tu usuario y contraseña.</div>
+    <div class="auth-err" id="lg-err"></div>
+    <div class="auth-ok" id="lg-ok"></div>
+    <div class="auth-field">
+      <label class="auth-label">Usuario</label>
+      <input class="auth-input" type="text" id="lg-user" placeholder="Tu usuario" autocomplete="username">
+    </div>
+    <div class="auth-field">
+      <label class="auth-label">Contraseña</label>
+      <div class="pw-wrap">
+        <input class="auth-input" type="password" id="lg-pass" placeholder="••••••••••••" autocomplete="current-password"
+          onkeydown="if(event.key==='Enter')doLogin()">
+        <button class="pw-eye" type="button" onclick="togglePw('lg-pass',this)">👁</button>
+      </div>
+    </div>
+    <div class="auth-loading" id="lg-loading" style="display:none">Verificando...</div>
+    <button class="auth-btn" onclick="doLogin()">Entrar</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     APP PRINCIPAL
+══════════════════════════════════════════════════════════ -->
+<div id="app" style="display:none;">
+
+<nav class="nav">
+  <div class="nb">Disciplina <span>Comercial</span></div>
+  <div class="nt">
+    <button class="ntb active" id="nb-dashboard" onclick="sv('dashboard')">Dashboard</button>
+    <button class="ntb" id="nb-evaluar" onclick="sv('evaluar')">Evaluar</button>
+    <button class="ntb" id="nb-evolución" onclick="sv('evolución')">Evolución</button>
+    <button class="ntb" id="nb-oficinas" onclick="sv('oficinas')">Por oficina</button>
+    <button class="ntb" id="nb-acomp" onclick="sv('acomp')">Acompañamiento</button>
+    <button class="ntb" id="nb-admin" onclick="sv('admin')">Administración</button>
+    <button class="ntb" id="nb-usuarios" onclick="sv('usuarios')" style="display:none;">Usuarios</button>
+  </div>
+  <div class="nu">
+    <span class="nu-name" id="nu-name">—</span>
+    <span class="nu-role" id="nu-role">—</span>
+    <button class="logout-btn" onclick="doLogout()">Salir</button>
+  </div>
+</nav>
+
+<!-- Dashboard -->
+<div class="vw active" id="vw-dashboard">
+  <div class="pt" id="dt">Dashboard</div><div class="ps" id="ds"></div>
+  <div class="fr">
+    <select class="sel" id="dm" onchange="rD()">
+      <option value="2025-01">Ene 2025</option><option value="2025-02">Feb 2025</option><option value="2025-03">Mar 2025</option><option value="2025-04">Abr 2025</option><option value="2025-05">May 2025</option><option value="2025-06">Jun 2025</option><option value="2025-07">Jul 2025</option><option value="2025-08">Ago 2025</option><option value="2025-09">Sep 2025</option><option value="2025-10">Oct 2025</option><option value="2025-11">Nov 2025</option><option value="2025-12">Dic 2025</option>
+      <option value="2026-01">Ene 2026</option><option value="2026-02">Feb 2026</option><option value="2026-03">Mar 2026</option><option value="2026-04">Abr 2026</option><option value="2026-05">May 2026</option><option value="2026-06">Jun 2026</option><option value="2026-07">Jul 2026</option><option value="2026-08">Ago 2026</option><option value="2026-09">Sep 2026</option><option value="2026-10">Oct 2026</option><option value="2026-11">Nov 2026</option><option value="2026-12">Dic 2026</option>
+    </select>
+    <button class="chip active" id="chip-todos" onclick="sC('todos')">Todos</button>
+    <button class="chip" id="chip-evaluados" onclick="sC('evaluados')">Evaluados</button>
+    <button class="chip" id="chip-pendientes" onclick="sC('pendientes')">Pendientes</button>
+    <button class="chip" id="chip-truncos" onclick="sC('truncos')">Sin cerrar</button>
+    <select class="sel" id="dof" onchange="rD()"><option value="">Todas las oficinas</option></select>
+    <input class="inp" placeholder="Buscar ejecutivo..." oninput="rD()" id="dq" style="width:190px">
+    <button class="btn btn-p btn-sm" onclick="exportarExcel()" style="margin-left:auto;">⬇ Exportar Excel</button>
+  </div>
+  <div class="sr" id="sr"></div>
+  <div class="tw"><div class="th2"><span class="tt" id="tl">Ejecutivos</span></div>
+    <table><thead><tr><th>Ejecutivo</th><th>Oficina</th><th>Fase</th><th>Score anterior</th><th>Este mes</th><th>Acción</th></tr></thead><tbody id="etb"></tbody></table>
+  </div>
+</div>
+
+<!-- Evaluar -->
+<div class="vw" id="vw-evaluar">
+  <div class="pt">Evaluar ejecutivo</div>
+  <div class="ps">Si ya existe evaluación del mes seleccionado, se carga automáticamente con sus checks</div>
+  <div style="background:var(--surface);border:1px solid var(--bd);border-radius:var(--r);padding:18px;margin-bottom:20px;display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
+    <div style="flex:1;min-width:180px;"><label style="font-size:12px;color:var(--t2);display:block;margin-bottom:6px;">Ejecutivo</label>
+      <select class="sel" style="width:100%;" id="eej" onchange="lE()"><option value="">Selecciona</option></select></div>
+    <div><label style="font-size:12px;color:var(--t2);display:block;margin-bottom:6px;">Mes</label>
+      <select class="sel" id="emes" onchange="lE()">
+      <option value="2025-01">Ene 2025</option><option value="2025-02">Feb 2025</option><option value="2025-03">Mar 2025</option><option value="2025-04">Abr 2025</option><option value="2025-05">May 2025</option><option value="2025-06">Jun 2025</option><option value="2025-07">Jul 2025</option><option value="2025-08">Ago 2025</option><option value="2025-09">Sep 2025</option><option value="2025-10">Oct 2025</option><option value="2025-11">Nov 2025</option><option value="2025-12">Dic 2025</option>
+      <option value="2026-01">Ene 2026</option><option value="2026-02">Feb 2026</option><option value="2026-03">Mar 2026</option><option value="2026-04">Abr 2026</option><option value="2026-05">May 2026</option><option value="2026-06">Jun 2026</option><option value="2026-07">Jul 2026</option><option value="2026-08">Ago 2026</option><option value="2026-09">Sep 2026</option><option value="2026-10">Oct 2026</option><option value="2026-11">Nov 2026</option><option value="2026-12">Dic 2026</option>
+    </select></div>
+    <div style="flex:1;min-width:180px;"><label style="font-size:12px;color:var(--t2);display:block;margin-bottom:6px;">Notas</label>
+      <input class="inp" style="width:100%;" placeholder="Observaciones opcionales..." id="enotas"></div>
+  </div>
+  <div id="ewrap" style="display:none;">
+    <div class="ss">
+      <div><div class="sn" id="esn" style="color:var(--t3);">0</div><div style="font-size:12px;color:var(--t2);margin-top:2px;">puntos de 100</div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:6px;" id="esem"><div style="width:8px;height:8px;border-radius:50%;background:var(--t3);"></div><span style="font-size:12px;color:var(--t3);">Sin evaluar</span></div>
+      </div>
+      <div class="mb" id="emb"></div>
+      <div id="eprev" style="font-size:12px;color:var(--t2);"></div>
+    </div>
+    <div id="ecrits"></div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;">
+      <button class="btn" onclick="resetE()">Reiniciar</button>
+      <button class="btn btn-p" onclick="guardar()">Guardar evaluación</button>
+    </div>
+  </div>
+  <div id="eempty" class="empty">Selecciona un ejecutivo para cargar el scorecard</div>
+</div>
+
+<!-- Evolución -->
+<div class="vw" id="vw-evolución">
+  <div class="pt">Evolución por ejecutivo</div><div class="ps">Historial de scores mes a mes</div>
+  <div class="fr">
+    <input class="inp" placeholder="Buscar ejecutivo..." oninput="rEvo()" id="evq" style="width:220px;">
+    <select class="sel" onchange="rEvo()" id="evof"><option value="">Todas las oficinas</option></select>
+  </div>
+  <div id="evlist"></div>
+</div>
+
+<!-- Por oficina -->
+<div class="vw" id="vw-oficinas">
+  <div class="pt">Disciplina por oficina</div>
+  <div class="ps">Score promedio del equipo y alertas cuando la mayoria tiene bajo desempeño en un criterio</div>
+  <div class="fr">
+    <select class="sel" id="ofm" onchange="rOf()">
+      <option value="2025-01">Ene 2025</option><option value="2025-02">Feb 2025</option><option value="2025-03">Mar 2025</option><option value="2025-04">Abr 2025</option><option value="2025-05">May 2025</option><option value="2025-06">Jun 2025</option><option value="2025-07">Jul 2025</option><option value="2025-08">Ago 2025</option><option value="2025-09">Sep 2025</option><option value="2025-10">Oct 2025</option><option value="2025-11">Nov 2025</option><option value="2025-12">Dic 2025</option>
+      <option value="2026-01">Ene 2026</option><option value="2026-02">Feb 2026</option><option value="2026-03">Mar 2026</option><option value="2026-04">Abr 2026</option><option value="2026-05">May 2026</option><option value="2026-06">Jun 2026</option><option value="2026-07">Jul 2026</option><option value="2026-08">Ago 2026</option><option value="2026-09">Sep 2026</option><option value="2026-10">Oct 2026</option><option value="2026-11">Nov 2026</option><option value="2026-12">Dic 2026</option>
+    </select>
+    <label style="font-size:12px;color:var(--t2);display:flex;align-items:center;gap:6px;">
+      Alerta si: <input type="number" id="ofu" value="50" min="10" max="90" class="inp" style="width:54px;" onchange="rOf()"> % del equipo tiene criterio bajo 50%
+    </label>
+  </div>
+  <div id="ofv"></div>
+</div>
+
+<!-- Acompañamiento -->
+<div class="vw" id="vw-acomp">
+  <div class="pt">Acompañamiento</div>
+  <div class="ps">Registro de sesiones semanales y seguimiento de compromisos</div>
+  <div style="background:var(--surface);border:1px solid var(--bd);border-radius:var(--r);padding:18px;margin-bottom:20px;">
+    <div style="font-size:14px;font-weight:600;margin-bottom:14px;">Registrar sesión</div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;position:relative;">
+      <div style="flex:1;min-width:200px;">
+        <label style="font-size:12px;color:var(--t2);display:block;margin-bottom:6px;">Ejecutivo</label>
+        <input class="inp" style="width:100%;" id="ac-ej-search" placeholder="Escribe nombre..." oninput="acFilterEj(this.value)" autocomplete="off">
+        <input type="hidden" id="ac-ej">
+        <div id="ac-ej-dropdown" style="display:none;position:absolute;background:var(--surface);border:1px solid var(--bd2);border-radius:var(--rs);max-height:200px;overflow-y:auto;z-index:50;width:280px;box-shadow:0 4px 12px rgba(0,0,0,.1);"></div>
+      </div>
+      <div><label style="font-size:12px;color:var(--t2);display:block;margin-bottom:6px;">Fecha</label><input type="date" class="inp" id="ac-fecha"></div>
+    </div>
+    <div id="ac-prev-wrap" style="display:none;margin-top:14px;background:var(--bg);border-radius:var(--rs);padding:12px 14px;">
+      <div style="font-size:12px;color:var(--t2);margin-bottom:8px;font-weight:500;">Compromiso de la sesión anterior</div>
+      <div style="font-size:13px;color:var(--t);margin-bottom:10px;" id="ac-prev-texto">—</div>
+      <div style="font-size:12px;color:var(--t2);margin-bottom:6px;">¿Lo cumplió?</div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-sm" id="ac-si" onclick="acSetCumplio(true)" style="flex:1;">Sí</button>
+        <button class="btn btn-sm" id="ac-no" onclick="acSetCumplio(false)" style="flex:1;">No</button>
+      </div>
+    </div>
+    <div style="margin-top:14px;"><label style="font-size:12px;color:var(--t2);display:block;margin-bottom:6px;">Compromiso de esta sesión</label>
+      <input class="inp" id="ac-compromiso" placeholder="Específico, con nombre de agente y fecha si aplica..." style="width:100%;"></div>
+    <div style="margin-top:10px;"><label style="font-size:12px;color:var(--t2);display:block;margin-bottom:6px;">Notas (opcional)</label>
+      <input class="inp" id="ac-notas" placeholder="Observaciones de la sesión..." style="width:100%;"></div>
+    <div style="display:flex;justify-content:flex-end;margin-top:14px;">
+      <button class="btn btn-p" onclick="acGuardar()">Guardar sesión</button>
+    </div>
+  </div>
+  <div class="fr" style="margin-bottom:16px;">
+    <select class="sel" id="ac-of-filter" onchange="acRender()"><option value="">Todas las oficinas</option></select>
+    <input class="inp" placeholder="Buscar ejecutivo..." oninput="acRender()" id="ac-q" style="width:200px;">
+    <button class="chip active" id="ac-chip-todos" onclick="acChip('todos')">Todos</button>
+    <button class="chip" id="ac-chip-alerta" onclick="acChip('alerta')">Sin sesión +14 días</button>
+    <button class="chip" id="ac-chip-ok" onclick="acChip('ok')">Al día</button>
+  </div>
+  <div class="tw">
+    <div class="th2"><span class="tt" id="ac-tl">Ejecutivos con acompañamiento</span></div>
+    <table><thead><tr><th>Ejecutivo</th><th>Oficina</th><th>Sesiones este mes</th><th>Última sesión</th><th>Último compromiso</th><th>Estado</th><th></th></tr></thead><tbody id="ac-tbody"></tbody></table>
+  </div>
+  <div id="ac-historial-wrap" style="display:none;margin-top:20px;">
+    <div style="font-size:14px;font-weight:600;margin-bottom:12px;" id="ac-hist-title">Historial</div>
+    <div id="ac-hist-list"></div>
+    <button class="btn btn-sm" onclick="acCloseHist()" style="margin-top:8px;">Cerrar historial</button>
+  </div>
+</div>
+
+<!-- Administración (criterios - solo super_admin) -->
+<div class="vw" id="vw-admin">
+  <div class="pt">Administración</div><div class="ps">Haz clic en cualquier texto para editarlo directamente</div>
+  <div class="as"><div class="ash"><span class="ast">Oficinas</span><div style="display:flex;gap:8px;align-items:center;"><input class="inp" id="nueva-of" placeholder="Nombre de la oficina..." style="width:220px;" onkeydown="if(event.key==='Enter')addOf()"><button class="btn btn-sm btn-p" onclick="addOf()">+ Agregar</button></div></div><div id="adof"></div></div>
+  <div class="as"><div class="ash"><span class="ast">Ejecutivos</span><button class="btn btn-sm" onclick="openAE()">+ Agregar</button></div><div id="adej"></div></div>
+  <div class="as"><div class="ash"><span class="ast">Carga masiva de ejecutivos (CSV / TXT)</span></div>
+    <div style="padding:14px 18px;">
+      <div style="font-size:12px;color:var(--t2);margin-bottom:8px;">Formato: <code style="background:var(--bg);padding:1px 6px;border-radius:4px;">nombre,oficina_nombre,fase</code> — la fase es opcional.</div>
+      <textarea class="inp" id="bulk-ej-txt" rows="4" style="width:100%;font-family:'DM Mono',monospace;font-size:12px;" placeholder="Maria Garcia,Monterrey Norte,Fase 1&#10;Juan Lopez,CDMX Insurgentes,&#10;Pedro Ruiz,Puebla,Avanzado"></textarea>
+      <button class="btn btn-p btn-sm" onclick="previewBulkEj()" style="margin-top:8px;">Vista previa y agregar</button>
+    </div>
+  </div>
+  <div class="as" id="adcr-wrap"><div class="ash"><span class="ast">Criterios y banco de preguntas</span></div><div id="adcr"></div></div>
+</div>
+
+<!-- Gestión de Usuarios (solo super_admin) -->
+<div class="vw" id="vw-usuarios">
+  <div class="pt">Gestión de usuarios</div><div class="ps">Solo super administradores pueden gestionar accesos.</div>
+
+  <!-- Cambiar código global -->
+  <div class="as" style="margin-bottom:16px;">
+    <div class="ash"><span class="ast">Código de acceso global</span>
+      <button class="btn btn-sm" onclick="openModalCodigoGlobal()">Cambiar código</button>
+    </div>
+    <div style="padding:12px 18px;font-size:13px;color:var(--t2);">El código protege el primer acceso a la herramienta. Cámbialo periódicamente.</div>
+  </div>
+
+  <!-- Crear usuario individual -->
+  <div class="as" style="margin-bottom:16px;">
+    <div class="ash"><span class="ast">Crear usuario</span></div>
+    <div style="padding:16px 18px;">
+      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
+        <div style="flex:1;min-width:160px;"><label style="font-size:12px;color:var(--t2);display:block;margin-bottom:5px;">Usuario</label>
+          <input class="inp" style="width:100%;" id="nu-usr" placeholder="Ej: EJC01" autocomplete="off"></div>
+        <div><label style="font-size:12px;color:var(--t2);display:block;margin-bottom:5px;">Rol</label>
+          <select class="sel" id="nu-rol"><option value="evaluador">Evaluador</option><option value="super_admin">Super Admin</option></select></div>
+        <div style="flex:1;min-width:160px;"><label style="font-size:12px;color:var(--t2);display:block;margin-bottom:5px;">Contraseña (o generar)</label>
+          <div style="display:flex;gap:6px;">
+            <input class="inp" style="flex:1;" id="nu-pass" placeholder="Min. 12 caracteres..." type="text" autocomplete="off">
+            <button class="btn btn-sm" onclick="genPassField('nu-pass')">⚄ Gen.</button>
+          </div>
+        </div>
+        <button class="btn btn-p" onclick="crearUsuario()">+ Crear</button>
+      </div>
+      <div class="auth-err" id="nu-err" style="margin-top:10px;"></div>
+    </div>
+  </div>
+
+  <!-- Carga masiva -->
+  <div class="as" style="margin-bottom:16px;">
+    <div class="ash"><span class="ast">Carga masiva (CSV / TXT)</span></div>
+    <div style="padding:16px 18px;">
+      <div style="font-size:12px;color:var(--t2);margin-bottom:10px;">Formato: una línea por usuario → <code style="background:var(--bg);padding:2px 6px;border-radius:4px;">usuario,rol</code> — Ej: <code style="background:var(--bg);padding:2px 6px;border-radius:4px;">EJC01,evaluador</code></div>
+      <textarea class="inp" id="bulk-txt" rows="5" style="width:100%;font-family:'DM Mono',monospace;font-size:12px;" placeholder="EJC01,evaluador&#10;EJC02,evaluador&#10;ADM2,super_admin"></textarea>
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        <button class="btn btn-p" onclick="previewBulk()">Vista previa y crear</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabla de usuarios -->
+  <div class="tw">
+    <div class="th2"><span class="tt" id="usr-count">Usuarios</span>
+      <input class="inp" placeholder="Buscar..." oninput="renderUsers()" id="usr-q" style="width:180px;"></div>
+    <table><thead><tr><th>Usuario</th><th>Rol</th><th>Estado</th><th>Creado</th><th>Acciones</th></tr></thead>
+    <tbody id="usr-tbody"></tbody></table>
+  </div>
+</div>
+
+</div><!-- /app -->
+
+<!-- ══ MODALS ══ -->
+<!-- Evaluación guardada -->
+<div class="mov" id="msaved">
+  <div class="mo"><div class="moh"><div><div class="mot">Evaluación guardada</div><div class="mos" id="mss"></div></div><button class="mox" onclick="cM('msaved')">x</button></div>
+    <div class="mob" id="msb"></div>
+    <div class="mof"><button class="btn btn-p" onclick="cM('msaved');sv('dashboard')">Ir al dashboard</button></div>
+  </div>
+</div>
+
+<!-- Nuevo ejecutivo -->
+<div class="mov" id="maej">
+  <div class="mo" style="max-width:400px;"><div class="moh"><div><div class="mot">Nuevo ejecutivo</div></div><button class="mox" onclick="cM('maej')">x</button></div>
+    <div class="mob">
+      <div style="margin-bottom:14px;"><label style="font-size:12px;color:var(--t2);display:block;margin-bottom:6px;">Nombre completo</label><input class="inp" style="width:100%;" id="nejn" placeholder="Ej: Maria Garcia Lopez"></div>
+      <div style="margin-bottom:14px;"><label style="font-size:12px;color:var(--t2);display:block;margin-bottom:6px;">Oficina</label><select class="sel" style="width:100%;" id="nejof"></select></div>
+      <div><label style="font-size:12px;color:var(--t2);display:block;margin-bottom:6px;">Fase (opcional)</label><input class="inp" style="width:100%;" id="nejfase" placeholder="Ej: Fase 1" maxlength="30"></div>
+    </div>
+    <div class="mof"><button class="btn" onclick="cM('maej')">Cancelar</button><button class="btn btn-p" onclick="sNE()">Guardar</button></div>
+  </div>
+</div>
+
+<!-- Reset contraseña -->
+<div class="mov" id="m-reset">
+  <div class="mo" style="max-width:420px;">
+    <div class="moh"><div><div class="mot">Reset de contraseña</div><div class="mos" id="m-reset-sub"></div></div><button class="mox" onclick="cM('m-reset')">x</button></div>
+    <div class="mob">
+      <div class="pass-show" id="m-reset-pass" onclick="copyPass(this)">—</div>
+      <div class="pass-show-hint">Haz clic para copiar · Entrégala manualmente al usuario</div>
+      <div style="font-size:12px;color:var(--t2);margin-top:14px;padding:10px;background:var(--am2);border-radius:var(--rs);">⚠ Esta contraseña solo se muestra una vez. Cópiala antes de cerrar.</div>
+    </div>
+    <div class="mof"><button class="btn" onclick="cM('m-reset')">Cerrar</button></div>
+  </div>
+</div>
+
+<!-- Cambiar código global -->
+<div class="mov" id="m-codigo">
+  <div class="mo" style="max-width:420px;">
+    <div class="moh"><div><div class="mot">Cambiar código de acceso</div></div><button class="mox" onclick="cM('m-codigo')">x</button></div>
+    <div class="mob">
+      <div style="margin-bottom:14px;"><label style="font-size:12px;color:var(--t2);display:block;margin-bottom:6px;">Nuevo código (mín. 8 caracteres)</label>
+        <div class="pw-wrap"><input class="auth-input" type="password" id="m-cod-new" placeholder="Nuevo código..."><button class="pw-eye" type="button" onclick="togglePw('m-cod-new',this)">👁</button></div>
+      </div>
+      <div><label style="font-size:12px;color:var(--t2);display:block;margin-bottom:6px;">Confirmar nuevo código</label>
+        <input class="auth-input" type="password" id="m-cod-new2" placeholder="Repite el nuevo código">
+      </div>
+      <div class="auth-err" id="m-cod-err" style="margin-top:10px;"></div>
+    </div>
+    <div class="mof"><button class="btn" onclick="cM('m-codigo')">Cancelar</button><button class="btn btn-p" onclick="cambiarCodigo()">Guardar código</button></div>
+  </div>
+</div>
+
+<!-- Preview carga masiva -->
+<div class="mov" id="m-bulk">
+  <div class="mo mo-lg">
+    <div class="moh"><div><div class="mot">Vista previa — Carga masiva</div><div class="mos" id="m-bulk-sub"></div></div><button class="mox" onclick="cM('m-bulk')">x</button></div>
+    <div class="mob" id="m-bulk-body"></div>
+    <div class="mof"><button class="btn" onclick="cM('m-bulk')">Cancelar</button><button class="btn btn-p" onclick="confirmarBulk()">Crear usuarios</button></div>
+  </div>
+</div>
+
+<!-- Preview carga masiva ejecutivos -->
+<div class="mov" id="m-bulk-ej">
+  <div class="mo mo-lg">
+    <div class="moh"><div><div class="mot">Vista previa — Ejecutivos</div><div class="mos" id="m-bulk-ej-sub"></div></div><button class="mox" onclick="cM('m-bulk-ej')">x</button></div>
+    <div class="mob" id="m-bulk-ej-body"></div>
+    <div class="mof"><button class="btn" onclick="cM('m-bulk-ej')">Cancelar</button><button class="btn btn-p" onclick="confirmarBulkEj()">Agregar ejecutivos</button></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     JAVASCRIPT
+══════════════════════════════════════════════════════════ -->
+<script>
+// ── CONFIG ─────────────────────────────────────────────────
+const USE_SUPABASE = true; // → cambiar a true y poner credenciales para producción
+const SUPABASE_URL = 'https://dujxlwdwqovtwcmfbgqq.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR1anhsd2R3cW92dHdjbWZiZ3FxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0MjU5NDcsImV4cCI6MjA5NDAwMTk0N30.fDQA5a6gzG5cbZ9oFQRNUkRamSvLx2KCgz6hfpxG_gw';
+const DEFAULT_CODE = 'D1sc1pl1na2025!';
+const MN=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+const CC=['#1A7A52','#1A4A8A','#8A5C00','#8A1A1A','#4A2A8A','#D4537E'];
+
+// ── SESSION ────────────────────────────────────────────────
+let SESSION = JSON.parse(localStorage.getItem('dc_session')||'null');
+
+// ── DB ─────────────────────────────────────────────────────
+let chip='todos';
+let DB=JSON.parse(localStorage.getItem('dc_db')||'null')||{
+  oficinas:[{id:'o1',nombre:'Monterrey Norte'},{id:'o2',nombre:'Monterrey Sur'},{id:'o3',nombre:'Guadalajara Centro'},{id:'o4',nombre:'CDMX Insurgentes'},{id:'o5',nombre:'CDMX Santa Fe'},{id:'o6',nombre:'Puebla'},{id:'o7',nombre:'Leon'},{id:'o8',nombre:'Queretaro'},{id:'o9',nombre:'Tijuana'},{id:'o10',nombre:'Hermosillo'}],
+  ejecutivos:[{id:'e1',nombre:'Ana Martinez',oficina:'o1',fase:'Fase 1'},{id:'e2',nombre:'Carlos Reyes',oficina:'o1',fase:'Fase 2'},{id:'e3',nombre:'Sofia Torres',oficina:'o2',fase:'Fase 1'},{id:'e4',nombre:'Javier Medina',oficina:'o2',fase:''},{id:'e5',nombre:'Laura Sanchez',oficina:'o3',fase:'Avanzado'},{id:'e6',nombre:'Roberto Cruz',oficina:'o3',fase:'Fase 1'},{id:'e7',nombre:'Patricia Vargas',oficina:'o4',fase:''},{id:'e8',nombre:'Miguel Angel Flores',oficina:'o4',fase:'Fase 2'},{id:'e9',nombre:'Daniela Lopez',oficina:'o5',fase:'Intermedio'},{id:'e10',nombre:'Fernando Gomez',oficina:'o5',fase:''},{id:'e11',nombre:'Valeria Hernandez',oficina:'o6',fase:'Fase 1'},{id:'e12',nombre:'Andres Castillo',oficina:'o7',fase:''}],
+  evaluaciones:[
+    {id:'ev1',ejecutivo:'e1',mes:'2025-03',score:72,criterios:[80,60,70,100,80,50],notas:'',guardada:true,evaluador:'sistema',detalle:[[true,false,true,true],[true,false,true,false],[true,true,false],[true,true,false,false],[true,true,false,true],[false,true,false,true]]},
+    {id:'ev2',ejecutivo:'e1',mes:'2025-04',score:81,criterios:[90,80,70,100,80,65],notas:'',guardada:true,evaluador:'sistema',detalle:[[true,true,true,true],[true,true,true,false],[true,true,false],[true,true,true,false],[true,true,true,false],[false,true,true,true]]},
+    {id:'ev3',ejecutivo:'e2',mes:'2025-04',score:68,criterios:[70,70,50,80,70,70],notas:'',guardada:true,evaluador:'sistema',detalle:[[true,false,true,true],[true,true,true,false],[true,false,false],[true,true,true,false],[true,false,true,true],[true,true,false,true]]},
+    {id:'ev4',ejecutivo:'e5',mes:'2025-04',score:90,criterios:[100,90,90,100,80,80],notas:'Excelente',guardada:true,evaluador:'sistema',detalle:[[true,true,true,true],[true,true,true,true],[true,true,true],[true,true,true,true],[true,true,true,false],[true,true,true,true]]},
+    {id:'ev5',ejecutivo:'e7',mes:'2025-04',score:45,criterios:[40,50,30,60,40,55],notas:'Primer mes',guardada:true,evaluador:'sistema',detalle:[[false,true,false,true],[true,false,false,true],[false,false,true],[true,false,true,false],[false,true,false,false],[true,false,false,true]]},
+    {id:'ev6',ejecutivo:'e9',mes:'2025-04',score:77,criterios:[80,80,60,80,80,80],notas:'',guardada:true,evaluador:'sistema',detalle:[[true,true,true,false],[true,true,true,false],[true,false,true],[true,true,true,false],[true,true,false,true],[true,true,true,false]]},
+    {id:'ev7',ejecutivo:'e3',mes:'2025-05',score:null,criterios:null,notas:'',guardada:false,evaluador:'sistema',detalle:null}
+  ],
+  criterios:[
+    {id:'c1',nombre:'Uso de data para decisiones',peso:20,evidencias:[
+      {texto:'Puede mostrar un dashboard que consultó esta semana',tipo:'rotativa',pts:5,banco:['¿Cuánto lleva de cumplimiento al presupuesto en el mes en % y en $?','¿Qué agentes no están emitiendo en el mes?','¿Cuál es el presupuesto de X agente en el mes?','¿Cuál es el presupuesto de X agente acumulado?','¿Cuánto ha crecido o decrecido X agente a mes vencido?','¿Del cumplimiento al presupuesto de X agente cuánto lleva por ramo?','¿Qué agentes tienen prima negativa en el mes?']},
+      {texto:'Identifica los agentes con decremento vs año anterior y sabe cuántos son',tipo:'fija',pts:5,banco:[]},
+      {texto:'Tomó una acción concreta basada en un dato esta semana (puede describir cuál y qué hizo)',tipo:'fija',pts:5,banco:[]},
+      {texto:'No necesita que alguien más le interprete los datos; lo hace solo',tipo:'rotativa',pts:5,banco:['¿Sabe qué puede ver en cada sección del cuadro de mando?','¿Cómo se lee el primer gráfico de la segunda fila?','¿Cómo puedo saber qué agentes ya son productivos?','¿Cuántos agentes ya te emitieron más de $450,000?','¿Cuántos agentes te han emitido en lo que va del año?','¿Cuántos agentes te han vendido GMM en el mes?']}
+    ]},
+    {id:'c2',nombre:'Seguimiento de agentes activos',peso:20,evidencias:[
+      {texto:'Sabe el número exacto de agentes activos de su cartera hoy en el mes',tipo:'fija',pts:5,banco:[]},
+      {texto:'Sabe qué agentes no le han emitido en el mes',tipo:'fija',pts:5,banco:[]},
+      {texto:'Sabe qué agentes no le han emitido en el año',tipo:'fija',pts:5,banco:[]},
+      {texto:'Ejecutó al menos una acción de reactivación en los últimos 15 días (puede evidenciarlo)',tipo:'fija',pts:5,banco:[]}
+    ]},
+    {id:'c3',nombre:'Tuberías',peso:9,evidencias:[
+      {texto:'Sabe ingresar a las tuberías de flotillas y daños desde cuadro de mando',tipo:'rotativa',pts:3,banco:['¿Sabe poner los filtros en las tuberías?','¿Cuántos negocios y qué valor tienen los liberados en los últimos 15 días?','¿Cuántos negocios liberados tiene por producto?','¿Qué negocios tiene de más de $100,000?']},
+      {texto:'Tiene negocios solo vigentes en las tuberías (cuestionar 4 y todos deben seguir vivos)',tipo:'fija',pts:3,banco:[]},
+      {texto:'Ha enviado al BOT folios para cerrar (mostrar evidencia del correo)',tipo:'fija',pts:3,banco:[]}
+    ]},
+    {id:'c4',nombre:'Reuniones con gerente',peso:11,evidencias:[
+      {texto:'Las reuniones están agendadas recurrentemente (puede mostrar el calendario)',tipo:'fija',pts:3,banco:[]},
+      {texto:'Qué planes de acción se definieron (puede mostrar evidencia)',tipo:'fija',pts:3,banco:[]},
+      {texto:'La reunión de esta semana ya ocurrió (o tiene fecha confirmada)',tipo:'fija',pts:3,banco:[]},
+      {texto:'Los planes de acción ya fueron actualizados con su estatus',tipo:'fija',pts:2,banco:[]}
+    ]},
+    {id:'c5',nombre:'Proyección de cierre',peso:20,evidencias:[
+      {texto:'Conoce y sabe leer el archivo de proyección',tipo:'fija',pts:5,banco:[]},
+      {texto:'Tiene una proyección documentada para el mes (no de memoria)',tipo:'fija',pts:5,banco:[]},
+      {texto:'La proyección especifica los negocios a cerrar',tipo:'fija',pts:5,banco:[]},
+      {texto:'Se tienen planes de acción específicos si la proyección es menos del 100%',tipo:'fija',pts:5,banco:[]}
+    ]},
+    {id:'c6',nombre:'Plan de visitas',peso:20,evidencias:[
+      {texto:'Tiene un plan de visitas documentado para la semana actual (antes de que empiece)',tipo:'fija',pts:5,banco:[]},
+      {texto:'Uso de dashboards en visitas',tipo:'rotativa',pts:5,banco:['Puede mostrar cómo usaría el cuadro de mando en una visita con un agente filtrándolo','Puede mostrar cómo usaría la tubería de flotillas en una visita con un agente filtrándolo','Puede mostrar cómo usaría la tubería de daños en una visita con un agente filtrándolo']},
+      {texto:'Cada visita planeada tiene objetivo definido (no solo nombre del cliente)',tipo:'fija',pts:5,banco:[]},
+      {texto:'Puede ligar cómo una visita está ligada a data de algún dashboard',tipo:'fija',pts:5,banco:[]}
+    ]}
+  ]
+};
+function save(){localStorage.setItem('dc_db',JSON.stringify(DB));}
+
+// ── SUPABASE CLIENT ─────────────────────────────────────────
+let SB=null;
+if(USE_SUPABASE){
+  try{const _l=window.supabase||window.Supabase;SB=_l.createClient(SUPABASE_URL,SUPABASE_KEY);console.log('SB OK');}
+  catch(e){console.error('SB error:',e);}
+}
+
+// ══════════════════════════════════════════════════════════
+// UTILS
+// ══════════════════════════════════════════════════════════
+async function sha256(text){
+  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+function genPassField(fieldId){
+  const p=genPass();
+  document.getElementById(fieldId).value=p;
+}
+
+function genPass(){
+  const lc='abcdefghijkmnpqrstuvwxyz',uc='ABCDEFGHJKLMNPQRSTUVWXYZ',
+        nm='23456789',sp='!@#$%&*';
+  const all=lc+uc+nm+sp;
+  let p=lc[r(lc.length)]+uc[r(uc.length)]+nm[r(nm.length)]+sp[r(sp.length)];
+  for(let i=4;i<14;i++)p+=all[r(all.length)];
+  return p.split('').sort(()=>Math.random()-.5).join('');
+}
+function r(n){return Math.floor(Math.random()*n);}
+
+function togglePw(id,btn){
+  const el=document.getElementById(id);
+  el.type=el.type==='password'?'text':'password';
+  btn.textContent=el.type==='password'?'👁':'🙈';
+}
+
+function copyPass(el){
+  navigator.clipboard.writeText(el.textContent).catch(()=>{});
+  el.style.background='var(--gn)';el.style.color='#fff';
+  setTimeout(()=>{el.style.background='';el.style.color='';},1200);
+}
+
+function authErr(id,msg){
+  const el=document.getElementById(id);
+  el.textContent=msg;el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'),4000);
+}
+
+function showScr(id){
+  ['scr-unlock','scr-setup','scr-login'].forEach(s=>document.getElementById(s).classList.remove('show'));
+  document.getElementById('app').style.display='none';
+  if(id==='app'){document.getElementById('app').style.display='block';}
+  else{document.getElementById(id).classList.add('show');}
+}
+
+// ══════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════
+// AUTH — SUPABASE AUTH (Prod) / localStorage (Demo)
+// Email interno: usuario@disciplina.local
+// ══════════════════════════════════════════════════════════
+
+// Demo fallback helpers
+function getPerfiles(){return JSON.parse(localStorage.getItem('dc_perfiles')||'[]');}
+function savePerfiles(p){localStorage.setItem('dc_perfiles',JSON.stringify(p));}
+function getConfig(){return JSON.parse(localStorage.getItem('dc_config')||'{}');}
+function saveConfig(c){localStorage.setItem('dc_config',JSON.stringify(c));}
+const toEmail=u=>u+'@disciplina.local';
+const toUser=e=>e.replace('@disciplina.local','');
+
+// ── Código de acceso ───────────────────────────────────────
+async function getCodeHash(){
+  if(USE_SUPABASE&&SB){
+    const {data}=await SB.from('config').select('valor').eq('clave','codigo_acceso_hash').single();
+    return data?.valor||null;
+  }
+  const cfg=getConfig();
+  return cfg.codigo_acceso_hash||(await sha256(DEFAULT_CODE));
+}
+async function dbSetCode(newCode){
+  const h=await sha256(newCode);
+  if(USE_SUPABASE&&SB){
+    await SB.from('config').upsert({clave:'codigo_acceso_hash',valor:h,updated_at:new Date().toISOString()});return;
+  }
+  const cfg=getConfig();cfg.codigo_acceso_hash=h;saveConfig(cfg);
+}
+
+// ── Verificar si existe un super_admin ───────────────────
+async function hasSuperAdmin(){
+  if(USE_SUPABASE&&SB){
+    const {data}=await SB.from('perfiles').select('id').eq('rol','super_admin').eq('activo',true).limit(1);
+    return !!(data&&data.length);
+  }
+  return getPerfiles().some(p=>p.rol==='super_admin'&&p.activo);
+}
+
+// ── Restaurar sesión existente (Supabase persiste automático) ─
+async function checkExistingSession(){
+  if(!USE_SUPABASE||!SB)return false;
+  const {data:{session}}=await SB.auth.getSession();
+  if(!session)return false;
+  const {data:perfil}=await SB.from('perfiles').select('*').eq('id',session.user.id).single();
+  if(!perfil||!perfil.activo){await SB.auth.signOut();return false;}
+  SESSION={usuario:perfil.usuario,rol:perfil.rol,loggedIn:true,uid:session.user.id};
+  localStorage.setItem('dc_session',JSON.stringify(SESSION));
+  return true;
+}
+
+// ── Login ──────────────────────────────────────────────────
+async function dbLogin(usuario,password){
+  if(USE_SUPABASE&&SB){
+    const {data,error}=await SB.auth.signInWithPassword({email:toEmail(usuario),password});
+    if(error)return{ok:false,msg:'Usuario o contraseña incorrectos'};
+    const {data:perfil}=await SB.from('perfiles').select('*').eq('id',data.user.id).single();
+    if(!perfil)return{ok:false,msg:'Perfil no encontrado. Contacta al administrador.'};
+    if(!perfil.activo){await SB.auth.signOut();return{ok:false,msg:'Usuario desactivado. Contacta al administrador.'};}
+    return{ok:true,perfil};
+  }
+  // Demo: SHA-256
+  const h=await sha256(password);
+  const p=getPerfiles().find(p=>p.usuario===usuario);
+  if(!p)return{ok:false,msg:'Usuario no encontrado'};
+  if(!p.activo)return{ok:false,msg:'Usuario desactivado.'};
+  if(p.password_hash!==h)return{ok:false,msg:'Contraseña incorrecta'};
+  return{ok:true,perfil:p};
+}
+
+// ── Crear usuario ──────────────────────────────────────────
+async function dbCreateUser(usuario,password,rol){
+  if(USE_SUPABASE&&SB){
+    const {data,error}=await SB.auth.signUp({email:toEmail(usuario),password});
+    if(error)throw new Error(error.message==='User already registered'?'El usuario ya existe':error.message);
+    if(!data.user)throw new Error('No se pudo crear el usuario. Verifica que las confirmaciones de email estén desactivadas en Supabase.');
+    // Trigger auto-crea el perfil; actualizamos rol y usuario
+    await SB.from('perfiles').upsert({id:data.user.id,usuario,rol,activo:true},{onConflict:'id'});
+    return data.user;
+  }
+  const h=await sha256(password);
+  const perfiles=getPerfiles();
+  if(perfiles.find(p=>p.usuario===usuario))throw new Error('El usuario ya existe');
+  const np={id:'u'+Date.now(),usuario,password_hash:h,rol,activo:true,created_at:new Date().toISOString()};
+  perfiles.push(np);savePerfiles(perfiles);return np;
+}
+
+// ── Listar usuarios ────────────────────────────────────────
+async function dbGetUsers(){
+  if(USE_SUPABASE&&SB){
+    const {data}=await SB.from('perfiles').select('*').order('created_at',{ascending:false});
+    return data||[];
+  }
+  return getPerfiles();
+}
+
+// ── Activar / Desactivar ───────────────────────────────────
+async function dbToggleUser(id,activo){
+  if(USE_SUPABASE&&SB){await SB.from('perfiles').update({activo}).eq('id',id);return;}
+  const p=getPerfiles();const u=p.find(u=>u.id===id);if(u){u.activo=activo;savePerfiles(p);}
+}
+
+// ── Eliminar usuario ───────────────────────────────────────
+async function dbDeleteUser(id){
+  if(USE_SUPABASE&&SB){
+    // Elimina el perfil; el usuario en auth.users debe eliminarse desde el Dashboard
+    await SB.from('perfiles').delete().eq('id',id);
+    return;
+  }
+  savePerfiles(getPerfiles().filter(p=>p.id!==id));
+}
+
+// ── Reset contraseña ───────────────────────────────────────
+async function dbResetPass(id,newPass){
+  if(USE_SUPABASE&&SB){
+    // Solo posible para el usuario actual con anon key
+    if(SESSION?.uid===id){
+      const {error}=await SB.auth.updateUser({password:newPass});
+      if(error)throw new Error(error.message);
+      return;
+    }
+    throw new Error('_DASHBOARD_'); // señal para mostrar instrucciones
+  }
+  const h=await sha256(newPass);
+  const p=getPerfiles();const u=p.find(u=>u.id===id);if(u){u.password_hash=h;savePerfiles(p);}
+}
+
+// ══════════════════════════════════════════════════════════
+// AUTH FLOW
+// ══════════════════════════════════════════════════════════
+
+async function doUnlock(){
+  const code=document.getElementById('ue-code').value;if(!code)return;
+  document.getElementById('ue-loading').style.display='block';
+  try{
+    const expected=await getCodeHash();
+    const input=await sha256(code);
+    if(input!==expected){
+      document.getElementById('ue-loading').style.display='none';
+      authErr('ue-err','Código incorrecto. Intenta nuevamente.');
+      document.getElementById('ue-code').value='';return;
+    }
+    document.getElementById('ue-loading').style.display='none';
+    const hasSA=await hasSuperAdmin();
+    showScr(hasSA?'scr-login':'scr-setup');
+  }catch(e){
+    document.getElementById('ue-loading').style.display='none';
+    authErr('ue-err','Error de conexión. Intenta de nuevo.');
+  }
+}
+
+function validatePass(p){
+  if(p.length<12)return'Mínimo 12 caracteres';
+  if(!/[A-Z]/.test(p))return'Incluye al menos una mayúscula';
+  if(!/[0-9]/.test(p))return'Incluye al menos un número';
+  return null;
+}
+
+async function doSetup(){
+  const u=document.getElementById('su-user').value.trim();
+  const p=document.getElementById('su-pass').value;
+  const p2=document.getElementById('su-pass2').value;
+  if(!u){authErr('su-err','Ingresa un usuario');return;}
+  if(!/^[a-zA-Z0-9_\-@]+$/.test(u)){authErr('su-err','Solo letras, números, _ - @');return;}
+  const err=validatePass(p);if(err){authErr('su-err',err);return;}
+  if(p!==p2){authErr('su-err','Las contraseñas no coinciden');return;}
+  document.getElementById('su-loading').style.display='block';
+  try{
+    await dbCreateUser(u,p,'super_admin');
+    document.getElementById('su-loading').style.display='none';
+    showScr('scr-login');
+    const ok=document.getElementById('lg-ok');
+    ok.textContent='Administrador creado. Inicia sesión.';ok.classList.add('show');
+    document.getElementById('lg-user').value=u;
+  }catch(e){
+    document.getElementById('su-loading').style.display='none';
+    authErr('su-err',e.message||'Error al crear usuario');
+  }
+}
+
+async function doLogin(){
+  const u=document.getElementById('lg-user').value.trim();
+  const p=document.getElementById('lg-pass').value;
+  if(!u||!p){authErr('lg-err','Ingresa usuario y contraseña');return;}
+  document.getElementById('lg-loading').style.display='block';
+  try{
+    const res=await dbLogin(u,p);
+    document.getElementById('lg-loading').style.display='none';
+    if(!res.ok){authErr('lg-err',res.msg);document.getElementById('lg-pass').value='';return;}
+    SESSION={usuario:res.perfil.usuario,rol:res.perfil.rol,loggedIn:true,uid:res.perfil.id||null};
+    localStorage.setItem('dc_session',JSON.stringify(SESSION));
+    initApp();
+  }catch(e){
+    document.getElementById('lg-loading').style.display='none';
+    authErr('lg-err','Error de conexión');
+  }
+}
+
+async function doLogout(){
+  if(USE_SUPABASE&&SB)await SB.auth.signOut();
+  SESSION=null;localStorage.removeItem('dc_session');
+  document.getElementById('app').style.display='none';
+  document.getElementById('lg-pass').value='';
+  document.getElementById('lg-user').value='';
+  document.getElementById('ue-code').value='';
+  showScr('scr-unlock');
+}
+
+function initApp(){
+  document.getElementById('nu-name').textContent=SESSION.usuario;
+  const roleEl=document.getElementById('nu-role');
+  roleEl.textContent=SESSION.rol==='super_admin'?'Super Admin':'Evaluador';
+  roleEl.className='nu-role'+(SESSION.rol==='super_admin'?' sa':'');
+  document.getElementById('nb-usuarios').style.display=SESSION.rol==='super_admin'?'':'none';
+  showScr('app');
+  const _mes=new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0');
+  ['dm','emes','ofm'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=_mes;});
+  if(USE_SUPABASE&&SB)sbInit();
+  else{lES();rD();acInit();}
+}
+
+// ══════════════════════════════════════════════════════════
+// SUPABASE SYNC (misma lógica del original)
+// ══════════════════════════════════════════════════════════
+async function sbInit(){
+  if(!SB)return;
+  try{
+    const {data:ofs}=await SB.from('oficinas').select('id,nombre').order('nombre');
+    if(ofs&&ofs.length)DB.oficinas=ofs.map(o=>({id:o.id,nombre:o.nombre}));
+    const {data:ejs}=await SB.from('ejecutivos').select('id,nombre,oficina_id,fase').eq('activo',true).order('nombre');
+    if(ejs&&ejs.length)DB.ejecutivos=ejs.map(e=>({id:e.id,nombre:e.nombre,oficina:e.oficina_id,fase:e.fase||''}));
+    const {data:evs}=await SB.from('evaluaciones').select('id,ejecutivo_id,mes,score,scores_criterios,notas,guardada,detalle_checks,bancos_sel,evaluador');
+    if(evs&&evs.length){
+      DB.evaluaciones=evs.map(ev=>({id:ev.id,ejecutivo:ev.ejecutivo_id,mes:ev.mes,score:ev.score,criterios:ev.scores_criterios,notas:ev.notas||'',guardada:ev.guardada,evaluador:ev.evaluador||'',detalle:ev.detalle_checks||null,bancos:ev.bancos_sel||null}));
+    }else DB.evaluaciones=[];
+    save();rD();lES();
+    await acLoadFromSB();
+    console.log('Supabase OK');
+  }catch(e){console.error('SB error:',e);}
+}
+
+async function sbSaveEval(obj){
+  if(!SB)return;
+  try{
+    const {data,error}=await SB.from('evaluaciones').upsert({
+      ejecutivo_id:obj.ejecutivo,mes:obj.mes,score:obj.score,scores_criterios:obj.criterios,
+      notas:obj.notas,guardada:obj.guardada,evaluador:obj.evaluador||SESSION?.usuario||'',
+      detalle_checks:obj.detalle,bancos_sel:obj.bancos
+    },{onConflict:'ejecutivo_id,mes'}).select('id').single();
+    if(error)throw error;
+    const idx=DB.evaluaciones.findIndex(e=>e.ejecutivo===obj.ejecutivo&&e.mes===obj.mes);
+    if(idx>=0)DB.evaluaciones[idx].id=data.id;
+    save();
+  }catch(e){console.error('SB save eval:',e);}
+}
+
+async function sbSaveOficina(id,nombre){if(!SB)return;await SB.from('oficinas').update({nombre}).eq('id',id);}
+async function sbSaveEjecutivo(id,nombre,oficina_id,fase=''){if(!SB)return;await SB.from('ejecutivos').update({nombre,oficina_id,fase}).eq('id',id);}
+async function sbAddOficina(nombre){if(!SB)return null;const {data,error}=await SB.from('oficinas').insert({nombre}).select('id').single();if(error)return null;return data.id;}
+async function sbAddEjecutivo(nombre,oficina_id,fase=''){if(!SB)return null;const {data,error}=await SB.from('ejecutivos').insert({nombre,oficina_id,fase}).select('id').single();if(error)return null;return data.id;}
+
+// ══════════════════════════════════════════════════════════
+// APP LOGIC (100% original preservado)
+// ══════════════════════════════════════════════════════════
+function gOf(id){return DB.oficinas.find(o=>o.id===id)||{nombre:'?'};}
+function gEj(id){return DB.ejecutivos.find(e=>e.id===id)||{nombre:'?'};}
+function gEv(ejId,mes){return DB.evaluaciones.find(e=>e.ejecutivo===ejId&&e.mes===mes);}
+function gPrev(ejId,mes){return DB.evaluaciones.filter(e=>e.ejecutivo===ejId&&e.mes<mes&&e.guardada).sort((a,b)=>b.mes.localeCompare(a.mes))[0];}
+function mL(m){const[y,mo]=m.split('-');return MN[parseInt(mo)-1]+' '+y;}
+function sc(s){return s>=80?'#1A7A52':s>=60?'#8A5C00':'#A52A2A';}
+function sBd(s){
+  if(s===undefined||s===null)return'<span class="badge bgr">Sin evaluar</span>';
+  if(s>=80)return'<span class="badge bg">'+s+' - Sólida</span>';
+  if(s>=60)return'<span class="badge ba">'+s+' — En desarrollo</span>';
+  return'<span class="badge br">'+s+' - Atención</span>';
+}
+
+function sv(id){
+  document.querySelectorAll('.vw').forEach(v=>v.classList.remove('active'));
+  document.querySelectorAll('.ntb').forEach(t=>t.classList.remove('active'));
+  document.getElementById('vw-'+id).classList.add('active');
+  document.querySelectorAll('.ntb').forEach(t=>{if(t.getAttribute('onclick')&&t.getAttribute('onclick').includes("'"+id+"'"))t.classList.add('active');});
+  if(id==='dashboard')rD();
+  if(id==='evolución')rEvo();
+  if(id==='oficinas')rOf();
+  if(id==='admin')rAdmin();
+  if(id==='acomp')acInit();
+  if(id==='usuarios')renderUsers();
+}
+
+function sC(v){
+  chip=v;
+  ['todos','evaluados','pendientes','truncos'].forEach(c=>document.getElementById('chip-'+c).classList.toggle('active',c===v));
+  rD();
+}
+
+function rD(){
+  const mes=document.getElementById('dm').value;
+  const q=(document.getElementById('dq').value||'').toLowerCase();
+  const ofS=document.getElementById('dof');
+  const offF=ofS.value;
+  ofS.innerHTML='<option value="">Todas las oficinas</option>';
+  DB.oficinas.forEach(o=>ofS.innerHTML+='<option value="'+o.id+'"'+(o.id===offF?' selected':'')+'>'+o.nombre+'</option>');
+  const ejFiltrados=offF?DB.ejecutivos.filter(e=>e.oficina===offF):DB.ejecutivos;
+  const ejIds=new Set(ejFiltrados.map(e=>e.id));
+  const evsAll=DB.evaluaciones.filter(e=>e.mes===mes);
+  const evs=evsAll.filter(e=>ejIds.has(e.ejecutivo));
+  const em={};evsAll.forEach(e=>{em[e.ejecutivo]=e;});
+  const tot=ejFiltrados.length;
+  const evd=evs.filter(e=>e.guardada).length;
+  const tr=evs.filter(e=>!e.guardada).length;
+  const pend=tot-evd-tr;
+  const grd=evs.filter(e=>e.guardada);
+  const avg=grd.length?Math.round(grd.reduce((s,e)=>s+e.score,0)/grd.length):0;
+  const sol=grd.filter(e=>e.score>=80).length;
+  document.getElementById('dt').textContent='Dashboard - '+mL(mes);
+  document.getElementById('ds').textContent=evd+' de '+tot+' evaluados  |  '+tr+' sin cerrar  |  '+pend+' pendientes';
+  document.getElementById('sr').innerHTML=
+    '<div class="sc"><div class="sv">'+tot+'</div><div class="sl">Ejecutivos totales</div></div>'+
+    '<div class="sc g"><div class="sv">'+evd+'</div><div class="sl">Evaluados</div><div class="rb"><div class="rbt"><div class="rbf" style="width:'+Math.round(evd/tot*100)+'%;background:var(--gn)"></div></div><div class="rp">'+Math.round(evd/tot*100)+'%</div></div></div>'+
+    '<div class="sc a"><div class="sv">'+pend+'</div><div class="sl">Pendientes</div><div class="rb"><div class="rbt"><div class="rbf" style="width:'+Math.round(pend/tot*100)+'%;background:var(--am)"></div></div><div class="rp">'+Math.round(pend/tot*100)+'%</div></div></div>'+
+    '<div class="sc'+(tr>0?' a':'')+'"><div class="sv">'+tr+'</div><div class="sl">Sin cerrar</div></div>'+
+    '<div class="sc'+(avg>=80?' g':avg>=60?' a':avg>0?' r':'')+'"><div class="sv">'+(avg||'?')+'</div><div class="sl">Score promedio</div></div>'+
+    '<div class="sc g"><div class="sv">'+sol+'</div><div class="sl">Disciplina sólida</div></div>';
+  let lista=DB.ejecutivos;
+  if(q)lista=lista.filter(e=>e.nombre.toLowerCase().includes(q));
+  if(offF)lista=lista.filter(e=>e.oficina===offF);
+  if(chip==='evaluados')lista=lista.filter(e=>em[e.id]&&em[e.id].guardada);
+  if(chip==='pendientes')lista=lista.filter(e=>!em[e.id]);
+  if(chip==='truncos')lista=lista.filter(e=>em[e.id]&&!em[e.id].guardada);
+  document.getElementById('tl').textContent='Ejecutivos ('+lista.length+')';
+  let h='';
+  lista.forEach(ej=>{
+    const ev=em[ej.id];
+    const prev=gPrev(ej.id,mes);
+    const pc=prev?'<span style="font-size:12px;color:var(--t2)">'+mL(prev.mes)+': <b>'+prev.score+'</b> pts</span>':'<span style="color:var(--t3);font-size:12px">Sin historial</span>';
+    const ec=ev?(ev.guardada?sBd(ev.score):'<span class="badge ba">Sin cerrar</span>'):'<span class="badge bgr">Pendiente</span>';
+    const faseTag=ej.fase?'<span style="font-size:11px;font-weight:500;padding:2px 7px;border-radius:20px;background:var(--pu2);color:var(--pu);">'+ej.fase+'</span>':'<span style="color:var(--t3);font-size:11px;">—</span>';
+    h+='<tr><td style="font-weight:500">'+ej.nombre+'</td><td>'+gOf(ej.oficina).nombre+'</td><td>'+faseTag+'</td><td>'+pc+'</td><td>'+ec+'</td><td><button class="btn btn-sm" onclick="gE(\''+ej.id+'\',\''+mes+'\')">'+  (ev?'Ver / editar':'Evaluar')+'</button></td></tr>';
+  });
+  document.getElementById('etb').innerHTML=h||'<tr><td colspan="5" class="empty">Sin resultados</td></tr>';
+}
+
+let ES={c:[],b:[]};
+function lES(){
+  const sel=document.getElementById('eej');
+  sel.innerHTML='<option value="">Selecciona</option>';
+  DB.ejecutivos.forEach(e=>{sel.innerHTML+='<option value="'+e.id+'">'+e.nombre+' - '+gOf(e.oficina).nombre+'</option>';});
+}
+function gE(ejId,mes){sv('evaluar');document.getElementById('eej').value=ejId;if(mes)document.getElementById('emes').value=mes;lE();}
+function lE(){
+  const ejId=document.getElementById('eej').value;
+  const mes=document.getElementById('emes').value;
+  if(!ejId){document.getElementById('ewrap').style.display='none';document.getElementById('eempty').style.display='block';return;}
+  document.getElementById('eempty').style.display='none';
+  document.getElementById('ewrap').style.display='block';
+  ES.c=DB.criterios.map(c=>c.evidencias.map(()=>false));
+  ES.b=DB.criterios.map(c=>c.evidencias.map(e=>e.tipo==='rotativa'?0:-1));
+  const ex=gEv(ejId,mes);
+  if(ex&&ex.detalle){
+    ex.detalle.forEach((row,ci)=>{if(Array.isArray(row))row.forEach((v,ei)=>{if(ES.c[ci]&&ei<ES.c[ci].length)ES.c[ci][ei]=!!v;});});
+    if(ex.bancos)ex.bancos.forEach((row,ci)=>{if(Array.isArray(row))row.forEach((v,ei)=>{if(ES.b[ci]&&ei<ES.b[ci].length&&typeof v==='number')ES.b[ci][ei]=v;});});
+    document.getElementById('enotas').value=ex.notas||'';
+  }else{document.getElementById('enotas').value='';}
+  const prev=gPrev(ejId,mes);
+  document.getElementById('eprev').innerHTML=prev?'Previo: <b>'+mL(prev.mes)+'</b> '+sBd(prev.score):'Sin evaluaciones previas';
+  rESc();
+}
+function rESc(){
+  let h='';
+  DB.criterios.forEach((c,ci)=>{
+    let eh='';
+    c.evidencias.forEach((e,ei)=>{
+      const tag=e.tipo==='fija'?'<span class="etag fija">Fija</span>':'<span class="etag rot">Rotativa</span>';
+      let bh='';
+      if(e.tipo==='rotativa'&&e.banco.length){
+        const s0=ES.b[ci][ei]||0;
+        bh='<div class="bw"><div class="bh"><span>Pregunta del mes</span><button class="brd" onclick="rB('+ci+','+ei+')">Aleatoria</button></div>'+
+          e.banco.map((b,bi)=>'<div class="bo'+(bi===s0?' sel':'')+'" id="bo-'+ci+'-'+ei+'-'+bi+'" onclick="sB('+ci+','+ei+','+bi+')">'+ mkR(bi===s0,'br-'+ci+'-'+ei+'-'+bi) +'<span>'+b+'</span></div>').join('')+'</div>';
+      }
+      eh+='<div class="er" onclick="tC('+ci+','+ei+')"><div class="eck'+(ES.c[ci][ei]?' on':'')+'" id="eck-'+ci+'-'+ei+'"></div><span class="etxt">'+e.texto+'</span>'+tag+'<span class="epts">'+e.pts+'p</span></div>'+bh;
+    });
+    h+='<div class="cb"><div class="ch" onclick="tCr('+ci+')"><span class="cpts">'+c.peso+'p</span><span class="cn">'+c.nombre+'</span><span class="csco" id="cs-'+ci+'" style="color:var(--t3)">0%</span><span class="ccv" id="cv-'+ci+'">+</span></div><div class="cbody" id="cbd-'+ci+'">'+eh+'<div class="pb"><div class="pf" id="pf-'+ci+'" style="width:0%;background:'+CC[ci]+'"></div></div></div></div>';
+  });
+  document.getElementById('ecrits').innerHTML=h;
+  uS();
+}
+function tCr(ci){document.getElementById('cbd-'+ci).classList.toggle('open');const cv=document.getElementById('cv-'+ci);cv.textContent=document.getElementById('cbd-'+ci).classList.contains('open')?'-':'+';}
+function tC(ci,ei){ES.c[ci][ei]=!ES.c[ci][ei];const el=document.getElementById('eck-'+ci+'-'+ei);if(el)el.classList.toggle('on',ES.c[ci][ei]);uS();autoSave();}
+function autoSave(){
+  const ejId=document.getElementById('eej').value;
+  const mes=document.getElementById('emes').value;
+  if(!ejId)return;
+  const idx=DB.evaluaciones.findIndex(e=>e.ejecutivo===ejId&&e.mes===mes);
+  const obj={id:idx>=0?DB.evaluaciones[idx].id:'ev'+Date.now(),ejecutivo:ejId,mes,score:null,criterios:null,notas:document.getElementById('enotas').value,guardada:false,evaluador:SESSION?.usuario||'',detalle:ES.c.map(r=>[...r]),bancos:ES.b.map(r=>[...r])};
+  if(idx>=0)DB.evaluaciones[idx]=obj;else DB.evaluaciones.push(obj);
+  save();
+  if(USE_SUPABASE)sbSaveEval(obj);
+}
+function mkR(sel,id){
+  const c=sel?'#4A2A8A':'#ccc';
+  return'<svg id="'+id+'" width="14" height="14" viewBox="0 0 14 14" style="flex-shrink:0;margin-top:2px;" xmlns="http://www.w3.org/2000/svg"><circle cx="7" cy="7" r="6" fill="none" stroke="'+c+'" stroke-width="1.5"/>'+(sel?'<circle cx="7" cy="7" r="3.5" fill="#4A2A8A"/>':'')+'</svg>';
+}
+function sB(ci,ei,bi){
+  ES.b[ci][ei]=bi;
+  DB.criterios[ci].evidencias[ei].banco.forEach((_,idx)=>{
+    const _r=document.getElementById('br-'+ci+'-'+ei+'-'+idx);
+    const o=document.getElementById('bo-'+ci+'-'+ei+'-'+idx);
+    if(_r)_r.outerHTML=mkR(idx===bi,'br-'+ci+'-'+ei+'-'+idx);
+    if(o)o.classList.toggle('sel',idx===bi);
+  });
+}
+function rB(ci,ei){const e=DB.criterios[ci].evidencias[ei];sB(ci,ei,Math.floor(Math.random()*e.banco.length));}
+function uS(){
+  let tot=0;const pts=[];
+  DB.criterios.forEach((c,ci)=>{
+    const tp=c.evidencias.reduce((s,e)=>s+e.pts,0);
+    const mp=ES.c[ci].reduce((s,v,ei)=>s+(v?c.evidencias[ei].pts:0),0);
+    const pct=Math.round((mp/tp)*100);pts.push(pct);tot+=(mp/tp)*c.peso;
+    const cs=document.getElementById('cs-'+ci);const pf=document.getElementById('pf-'+ci);
+    if(cs){cs.textContent=pct+'%';cs.style.color=pct>0?sc(pct):'var(--t3)';}
+    if(pf)pf.style.width=pct+'%';
+  });
+  const s=Math.round(tot);
+  const sn=document.getElementById('esn');if(sn){sn.textContent=s;sn.style.color=s>0?sc(s):'var(--t3)';}
+  const sem=document.getElementById('esem');
+  if(sem){const col=s>=80?'#1A7A52':s>=60?'#8A5C00':s>0?'#A52A2A':'var(--t3)';const lbl=s>=80?'Disciplina sólida':s>=60?'En desarrollo':s>0?'Requiere atención':'Sin evaluar';sem.innerHTML='<div style="width:8px;height:8px;border-radius:50%;background:'+col+'"></div><span style="font-size:12px;color:'+col+'">'+lbl+'</span>';}
+  let mb='';DB.criterios.forEach((c,ci)=>{mb+='<div class="mr"><span class="ml">'+c.nombre+'</span><div class="mt"><div class="mf" style="width:'+pts[ci]+'%;background:'+CC[ci]+'"></div></div><span class="mp">'+pts[ci]+'%</span></div>';});
+  document.getElementById('emb').innerHTML=mb;
+}
+function resetE(){ES.c=DB.criterios.map(c=>c.evidencias.map(()=>false));rESc();}
+function guardar(){
+  const ejId=document.getElementById('eej').value;
+  const mes=document.getElementById('emes').value;
+  const notas=document.getElementById('enotas').value;
+  if(!ejId)return alert('Selecciona un ejecutivo');
+  let tot=0;const cS=[];
+  DB.criterios.forEach((c,ci)=>{
+    const tp=c.evidencias.reduce((s,e)=>s+e.pts,0);
+    const mp=ES.c[ci].reduce((s,v,ei)=>s+(v?c.evidencias[ei].pts:0),0);
+    cS.push(Math.round((mp/tp)*100));tot+=(mp/tp)*c.peso;
+  });
+  const score=Math.round(tot);
+  const idx=DB.evaluaciones.findIndex(e=>e.ejecutivo===ejId&&e.mes===mes);
+  const obj={id:idx>=0?DB.evaluaciones[idx].id:'ev'+Date.now(),ejecutivo:ejId,mes,score,criterios:cS,notas,guardada:true,evaluador:SESSION?.usuario||'',detalle:ES.c.map(r=>[...r]),bancos:ES.b.map(r=>[...r])};
+  if(idx>=0)DB.evaluaciones[idx]=obj;else DB.evaluaciones.push(obj);
+  save();
+  if(USE_SUPABASE)sbSaveEval(obj);
+  const bajas=DB.criterios.filter((_,ci)=>cS[ci]<50).map(c=>c.nombre);
+  const ej=gEj(ejId);
+  document.getElementById('mss').textContent=ej.nombre+' - '+mL(mes);
+  document.getElementById('msb').innerHTML='<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;"><div style="font-size:36px;font-weight:600;color:'+sc(score)+'">'+score+'</div><div><div style="font-size:13px;font-weight:500;">'+(score>=80?'Disciplina sólida':score>=60?'En desarrollo':'Requiere atención')+'</div><div style="font-size:12px;color:var(--t2);">puntos de 100</div></div></div>'+(bajas.length?'<div style="font-size:12px;color:var(--t2);margin-bottom:8px;font-weight:500;">Criterios bajo 50%:</div>'+bajas.map(b=>'<div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid var(--bd);font-size:13px;"><span style="color:var(--rd);">▸</span>'+b+'</div>').join(''):'<div style="font-size:13px;color:var(--gn);">Todos los criterios superan el 50%.</div>');
+  document.getElementById('msaved').classList.add('open');
+}
+
+function rEvo(){
+  const q=(document.getElementById('evq').value||'').toLowerCase();
+  const cur=document.getElementById('evof').value;
+  const s=document.getElementById('evof');
+  s.innerHTML='<option value="">Todas las oficinas</option>';
+  DB.oficinas.forEach(o=>s.innerHTML+='<option value="'+o.id+'"'+(o.id===cur?' selected':'')+'>'+o.nombre+'</option>');
+  const _now=new Date();
+  const ms=[];
+  for(let i=5;i>=0;i--){const d=new Date(_now.getFullYear(),_now.getMonth()-i,1);ms.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'));}
+  let lista=DB.ejecutivos;
+  if(q)lista=lista.filter(e=>e.nombre.toLowerCase().includes(q));
+  if(cur)lista=lista.filter(e=>e.oficina===cur);
+  let h='';
+  lista.forEach(ej=>{
+    const evs=DB.evaluaciones.filter(e=>e.ejecutivo===ej.id&&e.guardada).sort((a,b)=>a.mes.localeCompare(b.mes));
+    if(!evs.length)return;
+    const em={};evs.forEach(e=>em[e.mes]=e);
+    const bars=ms.map(m=>{
+      const ev=em[m];
+      if(!ev)return'<div class="em"><div class="ebw"><div class="eb" style="height:0;background:var(--s2)"></div></div><div class="ev" style="color:var(--t3)">-</div><div class="em2">'+MN[parseInt(m.split('-')[1])-1]+'</div></div>';
+      const hh=Math.round((ev.score/100)*80);
+      return'<div class="em"><div class="ebw"><div class="eb" style="height:'+hh+'px;background:'+sc(ev.score)+'"></div></div><div class="ev" style="color:'+sc(ev.score)+'">'+ev.score+'</div><div class="em2">'+MN[parseInt(m.split('-')[1])-1]+'</div></div>';
+    }).join('');
+    const last=evs[evs.length-1];
+    h+='<div class="ec"><div class="eh"><div class="en">'+ej.nombre+'</div><div class="eof">'+gOf(ej.oficina).nombre+'</div>'+sBd(last.score)+'</div><div class="emo">'+bars+'</div></div>';
+  });
+  document.getElementById('evlist').innerHTML=h||'<div class="empty">Sin evaluaciones registradas</div>';
+}
+
+function rOf(){
+  const mes=document.getElementById('ofm').value;
+  const umb=parseInt(document.getElementById('ofu').value)||50;
+  let h='';
+  DB.oficinas.forEach(of=>{
+    const ejs=DB.ejecutivos.filter(e=>e.oficina===of.id);
+    if(!ejs.length)return;
+    const evs=ejs.map(e=>DB.evaluaciones.find(ev=>ev.ejecutivo===e.id&&ev.mes===mes&&ev.guardada)).filter(Boolean);
+    if(!evs.length){h+='<div class="oc"><div style="font-size:15px;font-weight:600;margin-bottom:4px;">'+of.nombre+'</div><div style="font-size:13px;color:var(--t2);">'+ejs.length+' ejecutivos - ninguno evaluado en '+mL(mes)+'</div></div>';return;}
+    const avg=Math.round(evs.reduce((s,e)=>s+e.score,0)/evs.length);
+    const sol=evs.filter(e=>e.score>=80).length;
+    const at=evs.filter(e=>e.score<60).length;
+    const cob=Math.round(evs.length/ejs.length*100);
+    const al=[];
+    DB.criterios.forEach((c,ci)=>{
+      const scores=evs.map(e=>e.criterios?e.criterios[ci]:null).filter(v=>v!==null);
+      if(!scores.length)return;
+      const bj=scores.filter(s=>s<50).length;
+      const pct=Math.round(bj/scores.length*100);
+      if(pct>=umb)al.push({nombre:c.nombre,pct,n:bj,total:scores.length});
+    });
+    const alH=al.length?'<div class="ab"><div style="font-weight:600;margin-bottom:4px;">Alerta — '+al.length+' criterio'+(al.length>1?'s':'')+' con bajo desempeño colectivo (>= '+umb+'% bajo 50%)</div>'+al.map(a=>'<div style="padding:3px 0;display:flex;gap:8px;"><span>▸</span><span>'+a.nombre+' - '+a.n+' de '+a.total+' ejecutivos bajo 50% ('+a.pct+'%)</span></div>').join('')+'</div>':'<div style="font-size:12px;color:var(--gn);margin-bottom:10px;">Sin alertas.</div>';
+    const cB=DB.criterios.map((c,ci)=>{const scores=evs.map(e=>e.criterios?e.criterios[ci]:0);const a2=scores.length?Math.round(scores.reduce((s,v)=>s+v,0)/scores.length):0;return'<div class="mr"><span class="ml">'+c.nombre+'</span><div class="mt"><div class="mf" style="width:'+a2+'%;background:'+CC[ci]+'"></div></div><span class="mp">'+a2+'%</span></div>';}).join('');
+    h+='<div class="oc"><div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:14px;flex-wrap:wrap;"><div><div style="font-size:15px;font-weight:600;margin-bottom:4px;">'+of.nombre+'</div><div style="font-size:12px;color:var(--t2);">'+ejs.length+' ejecutivos | '+evs.length+' evaluados | '+cob+'% cobertura</div></div><div style="display:flex;gap:8px;flex-wrap:wrap;">'+sBd(avg)+'<span class="badge bg">'+sol+' sólidos</span>'+(at?'<span class="badge br">'+at+' atención</span>':'')+'</div></div>'+alH+'<div style="font-size:12px;color:var(--t2);margin-bottom:6px;font-weight:500;">Promedio por criterio</div>'+cB+'</div>';
+  });
+  document.getElementById('ofv').innerHTML=h||'<div class="empty">Sin datos para este mes</div>';
+}
+
+function rAdmin(){
+  // Restrict criteria editing to super_admin
+  const isSA=SESSION?.rol==='super_admin';
+  document.getElementById('adcr-wrap').style.display=isSA?'':'none';
+  let oh='';DB.oficinas.forEach(o=>{oh+='<div class="ai"><input class="ed" value="'+o.nombre+'" onblur="uOf(\''+o.id+'\',this.value)"><span style="font-size:12px;color:var(--t2);">'+DB.ejecutivos.filter(e=>e.oficina===o.id).length+' ejecutivos</span></div>';});
+  document.getElementById('adof').innerHTML=oh||'<div class="empty">Sin oficinas</div>';
+  let eh='';DB.ejecutivos.forEach(ej=>{eh+='<div class="ai"><input class="ed" value="'+ej.nombre+'" onblur="uEjN(\''+ej.id+'\',this.value)"><select class="sel" onchange="uEjO(\''+ej.id+'\',this.value)">'+DB.oficinas.map(o=>'<option value="'+o.id+'"'+(o.id===ej.oficina?' selected':'')+'>'+o.nombre+'</option>').join('')+'</select><input class="inp" value="'+(ej.fase||'')+'" placeholder="Fase (opcional)" maxlength="30" style="width:140px;" onblur="uEjFase(\''+ej.id+'\',this.value)"><button class="btn btn-sm btn-danger" onclick="dEj(\''+ej.id+'\')">Eliminar</button></div>';});
+  document.getElementById('adej').innerHTML=eh||'<div class="empty">Sin ejecutivos</div>';
+  if(!isSA)return;
+  let ch='';
+  DB.criterios.forEach((c,ci)=>{
+    let evh='';
+    c.evidencias.forEach((e,ei)=>{
+      const bh=e.tipo==='rotativa'?'<div style="margin:6px 0 2px 20px;"><div style="font-size:11px;color:var(--t3);margin-bottom:4px;display:flex;align-items:center;justify-content:space-between;"><span>Banco rotativo</span><button class="btn btn-sm" onclick="addBI('+ci+','+ei+')">+ Agregar</button></div>'+e.banco.map((b,bi)=>'<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--bd);"><input class="ed" value="'+b+'" onblur="uBI('+ci+','+ei+','+bi+',this.value)" style="flex:1;font-size:12px;"><button class="btn btn-sm" onclick="dBI('+ci+','+ei+','+bi+')" style="color:var(--rd);">x</button></div>').join('')+'</div>':'';
+      evh+='<div style="padding:8px 0 4px;border-bottom:1px solid var(--bd);"><div style="display:flex;align-items:center;gap:8px;"><input class="ed" value="'+e.texto+'" onblur="uEvT('+ci+','+ei+',this.value)" style="flex:1;font-size:13px;"><span class="etag '+e.tipo+'">'+e.tipo+'</span><input type="number" value="'+e.pts+'" min="1" max="20" onblur="uEvP('+ci+','+ei+',this.value)" style="width:44px;text-align:center;border:1px solid var(--bd2);border-radius:4px;padding:3px;font-family:inherit;font-size:12px;background:var(--bg);"><button class="btn btn-sm" onclick="dEv('+ci+','+ei+')" style="color:var(--rd);">x</button></div>'+bh+'</div>';
+    });
+    ch+='<div style="border-bottom:1px solid var(--bd);padding:14px 18px;"><div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;"><input class="ed" value="'+c.nombre+'" onblur="uCN('+ci+',this.value)" style="font-size:14px;font-weight:600;flex:1;"><span style="font-size:12px;color:var(--t2);">Peso:</span><input type="number" value="'+c.peso+'" min="1" max="50" onblur="uCP('+ci+',this.value)" style="width:50px;text-align:center;border:1px solid var(--bd2);border-radius:4px;padding:4px;font-family:inherit;background:var(--bg);"><span style="font-size:12px;color:var(--t2);">pts</span></div>'+evh+'<button class="btn btn-sm" style="margin-top:8px;" onclick="addEv('+ci+')">+ Agregar evidencia</button></div>';
+  });
+  document.getElementById('adcr').innerHTML=ch;
+}
+
+function uOf(id,v){const l=v.trim();if(!l)return;const d=DB.oficinas.find(o=>o.id!==id&&o.nombre.toLowerCase()===l.toLowerCase());if(d){alert('Ya existe: '+d.nombre);rAdmin();return;}const o=DB.oficinas.find(o=>o.id===id);if(o){o.nombre=l;save();if(USE_SUPABASE)sbSaveOficina(id,l);}}
+function uEjN(id,v){const e=DB.ejecutivos.find(e=>e.id===id);if(e){e.nombre=v;save();if(USE_SUPABASE)sbSaveEjecutivo(id,v,e.oficina,e.fase||'');}
+}
+function uEjO(id,v){const e=DB.ejecutivos.find(e=>e.id===id);if(e){e.oficina=v;save();if(USE_SUPABASE)sbSaveEjecutivo(id,e.nombre,v,e.fase||'');}
+}
+function uEjFase(id,v){const e=DB.ejecutivos.find(e=>e.id===id);if(e){e.fase=v.trim();save();if(USE_SUPABASE)sbSaveEjecutivo(id,e.nombre,e.oficina,e.fase);}
+}
+function uCN(ci,v){DB.criterios[ci].nombre=v;save();}
+function uCP(ci,v){DB.criterios[ci].peso=parseInt(v)||0;save();}
+function uEvT(ci,ei,v){DB.criterios[ci].evidencias[ei].texto=v;save();}
+function uEvP(ci,ei,v){DB.criterios[ci].evidencias[ei].pts=parseInt(v)||0;save();}
+function uBI(ci,ei,bi,v){DB.criterios[ci].evidencias[ei].banco[bi]=v;save();}
+function dBI(ci,ei,bi){DB.criterios[ci].evidencias[ei].banco.splice(bi,1);save();rAdmin();}
+function addBI(ci,ei){DB.criterios[ci].evidencias[ei].banco.push('Nueva pregunta');save();rAdmin();}
+function addEv(ci){DB.criterios[ci].evidencias.push({texto:'Nueva evidencia',tipo:'fija',pts:5,banco:[]});save();rAdmin();}
+function dEv(ci,ei){DB.criterios[ci].evidencias.splice(ei,1);save();rAdmin();}
+function addOf(){
+  const el=document.getElementById('nueva-of');if(!el)return;
+  const l=(el.value||'').trim();if(!l){el.focus();return;}
+  const ex=DB.oficinas.find(o=>o.nombre.toLowerCase()===l.toLowerCase());
+  if(ex){el.style.borderColor='var(--rd)';setTimeout(()=>{el.style.borderColor='';},2000);return;}
+  if(USE_SUPABASE){sbAddOficina(l).then(id=>{if(id){DB.oficinas.push({id,nombre:l});save();el.value='';rAdmin();}});}
+  else{DB.oficinas.push({id:'o'+Date.now(),nombre:l});save();el.value='';rAdmin();}
+}
+function dEj(id){
+  if(!confirm('Eliminar este ejecutivo y todas sus evaluaciones?'))return;
+  DB.ejecutivos=DB.ejecutivos.filter(e=>e.id!==id);
+  DB.evaluaciones=DB.evaluaciones.filter(e=>e.ejecutivo!==id);
+  save();lES();rAdmin();
+  if(USE_SUPABASE){SB.from('ejecutivos').update({activo:false}).eq('id',id);SB.from('evaluaciones').delete().eq('ejecutivo_id',id);}
+}
+function openAE(){
+  const s=document.getElementById('nejof');s.innerHTML=DB.oficinas.map(o=>'<option value="'+o.id+'">'+o.nombre+'</option>').join('');
+  document.getElementById('nejn').value='';document.getElementById('nejfase').value='';document.getElementById('maej').classList.add('open');
+}
+function sNE(){
+  const n=document.getElementById('nejn').value.trim();const of=document.getElementById('nejof').value;const fase=document.getElementById('nejfase').value.trim();
+  if(!n)return alert('Ingresa el nombre');
+  if(USE_SUPABASE){sbAddEjecutivo(n,of,fase).then(id=>{if(id){DB.ejecutivos.push({id,nombre:n,oficina:of,fase});save();rAdmin();lES();cM('maej');}});}
+  else{DB.ejecutivos.push({id:'e'+Date.now(),nombre:n,oficina:of,fase});save();rAdmin();lES();cM('maej');}
+}
+function cM(id){document.getElementById(id).classList.remove('open');}
+
+// ══════════════════════════════════════════════════════════
+// ACOMPAÑAMIENTO (100% original)
+// ══════════════════════════════════════════════════════════
+let acChipVal='todos';let acCumplioVal=null;
+
+function acInit(){
+  const searchEl=document.getElementById('ac-ej-search');if(searchEl)searchEl.value='';
+  document.getElementById('ac-ej').value='';
+  const ofS=document.getElementById('ac-of-filter');const cur=ofS.value;
+  ofS.innerHTML='<option value="">Todas las oficinas</option>';
+  DB.oficinas.forEach(o=>ofS.innerHTML+='<option value="'+o.id+'"'+(o.id===cur?' selected':'')+'>'+o.nombre+'</option>');
+  document.getElementById('ac-fecha').value=new Date().toISOString().split('T')[0];
+  acRender();
+}
+function normalize(s){return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');}
+function acFilterEj(q){
+  const drop=document.getElementById('ac-ej-dropdown');
+  if(!q||q.length<1){drop.style.display='none';return;}
+  const qn=normalize(q);
+  const matches=DB.ejecutivos.filter(e=>normalize(e.nombre).includes(qn)).slice(0,10);
+  if(!matches.length){drop.style.display='none';return;}
+  drop.innerHTML=matches.map(e=>'<div onclick="acSelectEj(\''+e.id+'\',\''+e.nombre+'\')" style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:0.5px solid var(--bd);" onmouseover="this.style.background=\'var(--s2)\'" onmouseout="this.style.background=\'\'"><div style="font-weight:500;">'+e.nombre+'</div><div style="font-size:11px;color:var(--t2);">'+gOf(e.oficina).nombre+'</div></div>').join('');
+  drop.style.display='block';
+}
+function acSelectEj(id,nombre){
+  document.getElementById('ac-ej').value=id;document.getElementById('ac-ej-search').value=nombre;
+  document.getElementById('ac-ej-dropdown').style.display='none';acLoadPrev();
+}
+document.addEventListener('click',function(e){
+  if(e.target.id!=='ac-ej-search'){const d=document.getElementById('ac-ej-dropdown');if(d)d.style.display='none';}
+});
+function acLoadPrev(){
+  const ejId=document.getElementById('ac-ej').value;
+  if(!ejId){document.getElementById('ac-prev-wrap').style.display='none';return;}
+  const hist=(DB.acompañamientos||[]).filter(a=>a.ejecutivo===ejId).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  if(hist.length){
+    document.getElementById('ac-prev-wrap').style.display='block';
+    document.getElementById('ac-prev-texto').textContent=hist[0].compromiso_nuevo||'—';
+    acCumplioVal=null;
+    document.getElementById('ac-si').style.background='';document.getElementById('ac-no').style.background='';
+  }else{document.getElementById('ac-prev-wrap').style.display='none';}
+}
+function acSetCumplio(val){
+  acCumplioVal=val;
+  document.getElementById('ac-si').style.background=val?'var(--gn2)':'';
+  document.getElementById('ac-si').style.color=val?'var(--gn)':'';
+  document.getElementById('ac-no').style.background=!val?'var(--rd2)':'';
+  document.getElementById('ac-no').style.color=!val?'var(--rd)':'';
+}
+function acGuardar(){
+  const ejId=document.getElementById('ac-ej').value;
+  const fecha=document.getElementById('ac-fecha').value;
+  const compromiso=document.getElementById('ac-compromiso').value.trim();
+  const notas=document.getElementById('ac-notas').value.trim();
+  const quien=SESSION?.usuario||'Sistema';
+  if(!ejId)return alert('Selecciona un ejecutivo');
+  if(!fecha)return alert('Selecciona la fecha');
+  if(!compromiso)return alert('Ingresa el compromiso de la sesión');
+  const hist=(DB.acompañamientos||[]).filter(a=>a.ejecutivo===ejId).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  const prevComp=hist.length?hist[0].compromiso_nuevo:null;
+  const obj={id:'ac'+Date.now(),ejecutivo:ejId,fecha,cumplio_anterior:hist.length?acCumplioVal:null,compromiso_anterior:prevComp,compromiso_nuevo:compromiso,notas,registrado_por:quien};
+  if(!DB.acompañamientos)DB.acompañamientos=[];
+  DB.acompañamientos.push(obj);save();
+  if(USE_SUPABASE){SB.from('acompañamientos').insert({ejecutivo_id:ejId,fecha,cumplio_anterior:hist.length?acCumplioVal:null,compromiso_anterior:prevComp,compromiso_nuevo:compromiso,notas,registrado_por:quien}).then(({error})=>{if(error)console.error('AC save:',error);});}
+  document.getElementById('ac-compromiso').value='';document.getElementById('ac-notas').value='';
+  document.getElementById('ac-prev-wrap').style.display='none';acCumplioVal=null;acRender();
+  alert('Sesión registrada correctamente');
+}
+function acChip(v){
+  acChipVal=v;
+  ['todos','alerta','ok'].forEach(c=>document.getElementById('ac-chip-'+c).classList.toggle('active',c===v));
+  acRender();
+}
+function acRender(){
+  const of=document.getElementById('ac-of-filter').value;
+  const q=(document.getElementById('ac-q').value||'').toLowerCase();
+  const now=new Date();const mesActual=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  const hoy=now.toISOString().split('T')[0];
+  let lista=DB.ejecutivos;
+  if(of)lista=lista.filter(e=>e.oficina===of);
+  if(q)lista=lista.filter(e=>e.nombre.toLowerCase().includes(q));
+  const acomps=DB.acompañamientos||[];
+  lista=lista.filter(ej=>{
+    const hist=acomps.filter(a=>a.ejecutivo===ej.id).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+    const last=hist[0];
+    const dias=last?Math.floor((new Date(hoy)-new Date(last.fecha))/(86400000)):999;
+    if(acChipVal==='alerta')return dias>14;
+    if(acChipVal==='ok')return dias<=14;
+    return true;
+  });
+  document.getElementById('ac-tl').textContent='Ejecutivos con acompañamiento ('+lista.length+')';
+  let h='';
+  lista.forEach(ej=>{
+    const hist=acomps.filter(a=>a.ejecutivo===ej.id).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+    const enMes=hist.filter(a=>a.fecha.startsWith(mesActual)).length;
+    const last=hist[0];
+    const dias=last?Math.floor((new Date(hoy)-new Date(last.fecha))/(86400000)):null;
+    const estado=dias===null?'<span class="badge bgr">Sin sesiones</span>':dias>14?'<span class="badge br">'+dias+' días sin sesión</span>':'<span class="badge bg">Al día</span>';
+    const uf=last?last.fecha:'—';
+    const uc=last?'<span style="font-size:12px;color:var(--t2);">'+last.compromiso_nuevo.substring(0,50)+(last.compromiso_nuevo.length>50?'...':'')+'</span>':'—';
+    h+='<tr><td style="font-weight:500">'+ej.nombre+'</td><td>'+gOf(ej.oficina).nombre+'</td><td style="font-size:13px;">'+enMes+'</td><td style="font-size:12px;color:var(--t2);">'+uf+'</td><td>'+uc+'</td><td>'+estado+'</td><td><button class="btn btn-sm" onclick="acVerHist(\''+ej.id+'\')">Ver historial</button></td></tr>';
+  });
+  document.getElementById('ac-tbody').innerHTML=h||'<tr><td colspan="7" class="empty">Sin resultados</td></tr>';
+}
+function acVerHist(ejId){
+  const ej=gEj(ejId);
+  const hist=(DB.acompañamientos||[]).filter(a=>a.ejecutivo===ejId).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  document.getElementById('ac-hist-title').textContent='Historial — '+ej.nombre;
+  let h='';
+  if(!hist.length){h='<div class="empty">Sin sesiones registradas</div>';}
+  else{hist.forEach(a=>{
+    const c=a.cumplio_anterior===null?'':a.cumplio_anterior?'<span class="badge bg" style="font-size:10px;">Cumplió</span>':'<span class="badge br" style="font-size:10px;">No cumplió</span>';
+    h+='<div style="background:var(--surface);border:1px solid var(--bd);border-radius:var(--rs);padding:12px 14px;margin-bottom:8px;"><div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;"><span style="font-size:12px;font-weight:500;">'+a.fecha+'</span>'+c+'<span style="font-size:11px;color:var(--t3);margin-left:auto;">'+a.registrado_por+'</span></div>'+(a.compromiso_anterior?'<div style="font-size:11px;color:var(--t3);margin-bottom:4px;">Compromiso anterior: '+a.compromiso_anterior+'</div>':'')+'<div style="font-size:13px;color:var(--t);"><b style="font-weight:500;font-size:11px;color:var(--t2);">Compromiso: </b>'+a.compromiso_nuevo+'</div>'+(a.notas?'<div style="font-size:11px;color:var(--t3);margin-top:4px;">'+a.notas+'</div>':'')+'</div>';
+  });}
+  document.getElementById('ac-hist-list').innerHTML=h;
+  document.getElementById('ac-historial-wrap').style.display='block';
+  document.getElementById('ac-historial-wrap').scrollIntoView({behavior:'smooth'});
+}
+function acCloseHist(){document.getElementById('ac-historial-wrap').style.display='none';}
+async function acLoadFromSB(){
+  if(!SB)return;
+  try{
+    const {data}=await SB.from('acompañamientos').select('id,ejecutivo_id,fecha,cumplio_anterior,compromiso_anterior,compromiso_nuevo,notas,registrado_por').order('fecha',{ascending:false});
+    if(data&&data.length){DB.acompañamientos=data.map(a=>({id:a.id,ejecutivo:a.ejecutivo_id,fecha:a.fecha,cumplio_anterior:a.cumplio_anterior,compromiso_anterior:a.compromiso_anterior,compromiso_nuevo:a.compromiso_nuevo,notas:a.notas||'',registrado_por:a.registrado_por||''}));save();}
+  }catch(e){console.error('AC load:',e);}
+}
+
+// ══════════════════════════════════════════════════════════
+// GESTIÓN DE USUARIOS
+// ══════════════════════════════════════════════════════════
+let _bulkData=[];
+
+async function renderUsers(){
+  const q=(document.getElementById('usr-q').value||'').toLowerCase();
+  const users=await dbGetUsers();
+  const filtered=q?users.filter(u=>u.usuario.toLowerCase().includes(q)):users;
+  document.getElementById('usr-count').textContent='Usuarios ('+filtered.length+')';
+  let h='';
+  filtered.forEach(u=>{
+    const rolTag=u.rol==='super_admin'?'<span class="usr-tag sa">Super Admin</span>':'<span class="usr-tag ev">Evaluador</span>';
+    const estTag=u.activo?'<span class="badge bg">Activo</span>':'<span class="usr-tag off">Desactivado</span>';
+    const fecha=u.created_at?u.created_at.split('T')[0]:'—';
+    const isSelf=u.usuario===SESSION?.usuario;
+    h+='<tr><td style="font-weight:500;font-family:\'DM Mono\',monospace;font-size:12px;">'+u.usuario+'</td><td>'+rolTag+'</td><td>'+estTag+'</td><td style="font-size:12px;color:var(--t2);">'+fecha+'</td><td>';
+    if(!isSelf){
+      h+='<div style="display:flex;gap:6px;">';
+      h+='<button class="btn btn-sm" onclick="doResetPass(\''+u.id+'\',\''+u.usuario+'\')">Reset pass.</button>';
+      h+=(u.activo?'<button class="btn btn-sm btn-danger" onclick="doToggleUser(\''+u.id+'\',false,\''+u.usuario+'\')">Desactivar</button>':'<button class="btn btn-sm" onclick="doToggleUser(\''+u.id+'\',true,\''+u.usuario+'\')" style="color:var(--gn);">Activar</button>');
+      h+='<button class="btn btn-sm btn-danger" onclick="doDeleteUser(\''+u.id+'\',\''+u.usuario+'\')">Eliminar</button>';
+      h+='</div>';
+    }else{h+='<span style="font-size:11px;color:var(--t3);">(tú)</span>';}
+    h+='</td></tr>';
+  });
+  document.getElementById('usr-tbody').innerHTML=h||'<tr><td colspan="5" class="empty">Sin usuarios</td></tr>';
+}
+
+async function crearUsuario(){
+  const u=document.getElementById('nu-usr').value.trim();
+  const p=document.getElementById('nu-pass').value;
+  const rol=document.getElementById('nu-rol').value;
+  const errEl=document.getElementById('nu-err');
+  errEl.style.display='none';
+  if(!u){errEl.textContent='Ingresa un nombre de usuario';errEl.style.display='block';return;}
+  if(!/^[a-zA-Z0-9_\-@]+$/.test(u)){errEl.textContent='Usuario solo puede contener letras, números, _ - @';errEl.style.display='block';return;}
+  if(!p||p.length<8){errEl.textContent='La contraseña debe tener al menos 8 caracteres';errEl.style.display='block';return;}
+  try{
+    await dbCreateUser(u,p,rol);
+    document.getElementById('nu-usr').value='';document.getElementById('nu-pass').value='';
+    renderUsers();
+  }catch(e){errEl.textContent=e.message||'Error al crear usuario';errEl.style.display='block';}
+}
+
+async function doResetPass(id,usuario){
+  const np=genPass();
+  try{
+    await dbResetPass(id,np);
+    // Propio usuario o demo mode
+    document.getElementById('m-reset-sub').textContent=usuario;
+    document.getElementById('m-reset-pass').textContent=np;
+    document.getElementById('m-reset').classList.add('open');
+  }catch(e){
+    if(e.message==='_DASHBOARD_'){
+      alert('Para resetear la contraseña de "'+usuario+'":\n\n1. Ve a supabase.com → tu proyecto\n2. Authentication → Users\n3. Busca al usuario por su email ('+usuario+'@disciplina.local)\n4. Clic en los tres puntos "..." → Send password recovery\n   o edita la contraseña directamente.');
+    }else{alert('Error: '+e.message);}
+  }
+}
+
+async function doToggleUser(id,activo,usuario){
+  const msg=activo?'¿Activar al usuario '+usuario+'?':'¿Desactivar al usuario '+usuario+'? No podrá iniciar sesión.';
+  if(!confirm(msg))return;
+  await dbToggleUser(id,activo);renderUsers();
+}
+
+async function doDeleteUser(id,usuario){
+  const conf=prompt('Escribe el usuario "'+usuario+'" para confirmar la eliminación:');
+  if(conf!==usuario){alert('Cancelado: el usuario no coincide.');return;}
+  await dbDeleteUser(id);renderUsers();
+}
+
+function openModalCodigoGlobal(){
+  document.getElementById('m-cod-new').value='';document.getElementById('m-cod-new2').value='';
+  document.getElementById('m-cod-err').style.display='none';
+  document.getElementById('m-codigo').classList.add('open');
+}
+
+async function cambiarCodigo(){
+  const n=document.getElementById('m-cod-new').value;
+  const n2=document.getElementById('m-cod-new2').value;
+  const e=document.getElementById('m-cod-err');
+  e.style.display='none';
+  if(!n||n.length<8){e.textContent='Mínimo 8 caracteres';e.style.display='block';return;}
+  if(n!==n2){e.textContent='Los códigos no coinciden';e.style.display='block';return;}
+  await dbSetCode(n);
+  cM('m-codigo');alert('Código de acceso actualizado correctamente.');
+}
+
+function previewBulk(){
+  const txt=document.getElementById('bulk-txt').value.trim();
+  if(!txt){alert('Ingresa al menos un usuario');return;}
+  const lines=txt.split('\n').map(l=>l.trim()).filter(Boolean);
+  _bulkData=[];
+  const errors=[];
+  lines.forEach((line,i)=>{
+    const parts=line.split(',');
+    if(parts.length<2){errors.push('Línea '+(i+1)+': formato inválido');return;}
+    const u=parts[0].trim();const rol=parts[1].trim().toLowerCase();
+    if(!u){errors.push('Línea '+(i+1)+': usuario vacío');return;}
+    if(!['evaluador','super_admin'].includes(rol)){errors.push('Línea '+(i+1)+': rol inválido (usa evaluador o super_admin)');return;}
+    const pass=genPass();
+    _bulkData.push({usuario:u,rol,pass});
+  });
+  if(errors.length){alert('Errores encontrados:\n'+errors.join('\n'));return;}
+  document.getElementById('m-bulk-sub').textContent=_bulkData.length+' usuarios a crear';
+  let h='<table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr><th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--bd);font-size:11px;color:var(--t3);">Usuario</th><th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--bd);font-size:11px;color:var(--t3);">Rol</th><th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--bd);font-size:11px;color:var(--t3);">Contraseña generada</th></tr></thead><tbody>';
+  _bulkData.forEach(d=>{
+    h+='<tr><td style="padding:7px 10px;font-family:\'DM Mono\',monospace;font-size:12px;">'+d.usuario+'</td><td style="padding:7px 10px;">'+d.rol+'</td><td style="padding:7px 10px;font-family:\'DM Mono\',monospace;font-size:12px;color:var(--gn);">'+d.pass+'</td></tr>';
+  });
+  h+='</tbody></table><div style="font-size:12px;color:var(--am);margin-top:12px;padding:10px;background:var(--am2);border-radius:var(--rs);">⚠ Copia o descarga las contraseñas antes de confirmar. No se volverán a mostrar.</div>';
+  document.getElementById('m-bulk-body').innerHTML=h;
+  document.getElementById('m-bulk').classList.add('open');
+}
+
+async function confirmarBulk(){
+  if(!_bulkData.length)return;
+  let ok=0;let errs=[];
+  for(const d of _bulkData){
+    try{await dbCreateUser(d.usuario,d.pass,d.rol);ok++;}
+    catch(e){errs.push(d.usuario+': '+e.message);}
+  }
+  cM('m-bulk');
+  document.getElementById('bulk-txt').value='';
+  _bulkData=[];
+  renderUsers();
+  let msg=ok+' usuario(s) creados correctamente.';
+  if(errs.length)msg+='\n\nErrores:\n'+errs.join('\n');
+  alert(msg);
+}
+
+// ══════════════════════════════════════════════════════════
+// EXPORTAR EXCEL
+// ══════════════════════════════════════════════════════════
+function exportarExcel(){
+  if(typeof XLSX==='undefined'){alert('SheetJS no disponible. Verifica la conexión a internet.');return;}
+  const rows=[['Fecha guardada','Mes','Ejecutivo','Oficina','Score Total',
+    ...DB.criterios.map(c=>c.nombre),
+    'Evaluador','Notas']];
+  const evs=DB.evaluaciones.filter(e=>e.guardada&&e.score!==null);
+  evs.sort((a,b)=>a.mes.localeCompare(b.mes));
+  evs.forEach(ev=>{
+    const ej=gEj(ev.ejecutivo);const of=gOf(ej.oficina);
+    const cScores=DB.criterios.map((_,ci)=>ev.criterios?ev.criterios[ci]:'');
+    rows.push([ev.id.replace('ev','').length>8?new Date().toISOString().split('T')[0]:'—',mL(ev.mes),ej.nombre,of.nombre,ev.score,...cScores,ev.evaluador||'',ev.notas||'']);
+  });
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  // Column widths
+  ws['!cols']=[{wch:14},{wch:10},{wch:28},{wch:22},{wch:11},...DB.criterios.map(()=>({wch:14})),{wch:16},{wch:32}];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,'Evaluaciones',ws);
+  // Acompañamientos sheet
+  const acRows=[['Ejecutivo','Oficina','Fecha','Registrado por','¿Cumplió anterior?','Compromiso anterior','Compromiso nuevo','Notas']];
+  (DB.acompañamientos||[]).sort((a,b)=>a.fecha.localeCompare(b.fecha)).forEach(a=>{
+    const ej=gEj(a.ejecutivo);const of=gOf(ej.oficina);
+    acRows.push([ej.nombre,of.nombre,a.fecha,a.registrado_por,a.cumplio_anterior===null?'—':a.cumplio_anterior?'Sí':'No',a.compromiso_anterior||'',a.compromiso_nuevo,a.notas||'']);
+  });
+  const ws2=XLSX.utils.aoa_to_sheet(acRows);
+  ws2['!cols']=[{wch:28},{wch:20},{wch:12},{wch:16},{wch:16},{wch:36},{wch:36},{wch:30}];
+  XLSX.utils.book_append_sheet(wb,'Acompañamiento',ws2);
+  const now=new Date();const fn='Disciplina_Comercial_'+now.getFullYear()+String(now.getMonth()+1).padStart(2,'0')+'.xlsx';
+  XLSX.writeFile(wb,fn);
+}
+
+// ── CARGA MASIVA EJECUTIVOS ─────────────────────────────────
+let _bulkEjData=[];
+function previewBulkEj(){
+  const txt=document.getElementById('bulk-ej-txt').value.trim();
+  if(!txt){alert('Ingresa al menos un ejecutivo');return;}
+  const lines=txt.split('\n').map(l=>l.trim()).filter(Boolean);
+  _bulkEjData=[];const errors=[];
+  lines.forEach((line,i)=>{
+    const parts=line.split(',');
+    if(parts.length<2){errors.push('Línea '+(i+1)+': se requiere nombre y oficina');return;}
+    const nombre=parts[0].trim();const ofNombre=parts[1].trim();const fase=(parts[2]||'').trim();
+    if(!nombre){errors.push('Línea '+(i+1)+': nombre vacío');return;}
+    const of=DB.oficinas.find(o=>o.nombre.toLowerCase()===ofNombre.toLowerCase());
+    if(!of){errors.push('Línea '+(i+1)+': oficina "'+ofNombre+'" no encontrada');return;}
+    _bulkEjData.push({nombre,oficina:of.id,ofNombre:of.nombre,fase});
+  });
+  if(errors.length){alert('Errores:\n'+errors.join('\n'));return;}
+  document.getElementById('m-bulk-ej-sub').textContent=_bulkEjData.length+' ejecutivos a agregar';
+  let h='<table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr>'+
+    '<th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--bd);font-size:11px;color:var(--t3);">Nombre</th>'+
+    '<th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--bd);font-size:11px;color:var(--t3);">Oficina</th>'+
+    '<th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--bd);font-size:11px;color:var(--t3);">Fase</th>'+
+    '</tr></thead><tbody>';
+  _bulkEjData.forEach(d=>{
+    h+='<tr><td style="padding:6px 10px;">'+d.nombre+'</td><td style="padding:6px 10px;">'+d.ofNombre+'</td><td style="padding:6px 10px;color:var(--pu);">'+( d.fase||'—')+'</td></tr>';
+  });
+  h+='</tbody></table>';
+  document.getElementById('m-bulk-ej-body').innerHTML=h;
+  document.getElementById('m-bulk-ej').classList.add('open');
+}
+async function confirmarBulkEj(){
+  if(!_bulkEjData.length)return;
+  let ok=0,errs=[];
+  for(const d of _bulkEjData){
+    try{
+      if(USE_SUPABASE){
+        const id=await sbAddEjecutivo(d.nombre,d.oficina,d.fase);
+        if(id){DB.ejecutivos.push({id,nombre:d.nombre,oficina:d.oficina,fase:d.fase});ok++;}
+        else throw new Error('Error en Supabase');
+      }else{DB.ejecutivos.push({id:'e'+Date.now()+ok,nombre:d.nombre,oficina:d.oficina,fase:d.fase});ok++;}
+    }catch(e){errs.push(d.nombre+': '+e.message);}
+  }
+  save();cM('m-bulk-ej');document.getElementById('bulk-ej-txt').value='';_bulkEjData=[];
+  lES();rAdmin();alert(ok+' ejecutivo(s) agregados.'+(errs.length?'\n\nErrores:\n'+errs.join('\n'):''));
+}
+
+// ══════════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════════
+(async function init(){
+  if(USE_SUPABASE&&SB){
+    // Supabase maneja la sesión automáticamente
+    const restored=await checkExistingSession();
+    if(!restored)showScr('scr-unlock');
+  }else{
+    // Demo: leer del localStorage
+    if(SESSION&&SESSION.loggedIn){initApp();}
+    // else se queda en scr-unlock (ya visible por defecto)
+  }
+})();
+</script>
+</body>
+</html>
