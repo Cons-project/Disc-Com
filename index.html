@@ -1577,39 +1577,87 @@ async function confirmarBulk(){
 // ══════════════════════════════════════════════════════════
 // EXPORTAR EXCEL
 // ══════════════════════════════════════════════════════════
-function exportarExcel(){
-  if(typeof XLSX==='undefined'){alert('SheetJS no disponible. Verifica la conexión a internet.');return;}
-  const rows=[['Fecha guardada','Mes','Ejecutivo','Oficina','Score Total',
-    ...DB.criterios.map(c=>c.nombre),
-    'Evaluador','Notas']];
-  const evs=DB.evaluaciones.filter(e=>e.guardada&&e.score!==null);
-  evs.sort((a,b)=>a.mes.localeCompare(b.mes));
+function descargarArchivo(contenido,nombre,tipo){
+  try{
+    const blob=new Blob([contenido],{type:tipo});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;a.download=nombre;a.style.display='none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url);},200);
+    return true;
+  }catch(e){console.error('Error en descarga:',e);return false;}
+}
+
+function exportarCSV(){
+  // CSV con BOM para que Excel lo abra con acentos correctos
+  const sep=',';const nl='\n';
+  const esc=v=>{if(v===null||v===undefined)return'';const s=String(v).replace(/"/g,'""');return /[",\n]/.test(s)?'"'+s+'"':s;};
+  let csv='\ufeff';
+  // Hoja 1: Evaluaciones
+  csv+='=== EVALUACIONES ==='+nl;
+  csv+=['Mes','Ejecutivo','Oficina','Fase','Score Total',...DB.criterios.map(c=>c.nombre),'Evaluador','Notas'].map(esc).join(sep)+nl;
+  const evs=(DB.evaluaciones||[]).filter(e=>e.guardada&&e.score!==null).sort((a,b)=>a.mes.localeCompare(b.mes));
   evs.forEach(ev=>{
     const ej=gEj(ev.ejecutivo);const of=gOf(ej.oficina);
     const cScores=DB.criterios.map((_,ci)=>ev.criterios?ev.criterios[ci]:'');
-    rows.push([ev.id.replace('ev','').length>8?new Date().toISOString().split('T')[0]:'—',mL(ev.mes),ej.nombre,of.nombre,ev.score,...cScores,ev.evaluador||'',ev.notas||'']);
+    csv+=[mL(ev.mes),ej.nombre,of.nombre,ej.fase||'',ev.score,...cScores,ev.evaluador||'',ev.notas||''].map(esc).join(sep)+nl;
   });
-  const ws=XLSX.utils.aoa_to_sheet(rows);
-  // Column widths
-  ws['!cols']=[{wch:14},{wch:10},{wch:28},{wch:22},{wch:11},...DB.criterios.map(()=>({wch:14})),{wch:16},{wch:32}];
-  const wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,'Evaluaciones',ws);
-  // Acompañamientos sheet
-  const acRows=[['Ejecutivo','Oficina','Fecha','Registrado por','¿Cumplió anterior?','Compromiso anterior','Compromiso nuevo','Notas']];
+  // Hoja 2: Acompañamientos
+  csv+=nl+'=== ACOMPAÑAMIENTO ==='+nl;
+  csv+=['Ejecutivo','Oficina','Fecha','Registrado por','Cumplió anterior','Compromiso anterior','Compromiso nuevo','Notas'].map(esc).join(sep)+nl;
   (DB.acompañamientos||[]).sort((a,b)=>a.fecha.localeCompare(b.fecha)).forEach(a=>{
     const ej=gEj(a.ejecutivo);const of=gOf(ej.oficina);
-    acRows.push([ej.nombre,of.nombre,a.fecha,a.registrado_por,a.cumplio_anterior===null?'—':a.cumplio_anterior?'Sí':'No',a.compromiso_anterior||'',a.compromiso_nuevo,a.notas||'']);
+    csv+=[ej.nombre,of.nombre,a.fecha,a.registrado_por,a.cumplio_anterior===null?'':a.cumplio_anterior?'Sí':'No',a.compromiso_anterior||'',a.compromiso_nuevo,a.notas||''].map(esc).join(sep)+nl;
   });
-  const ws2=XLSX.utils.aoa_to_sheet(acRows);
-  ws2['!cols']=[{wch:28},{wch:20},{wch:12},{wch:16},{wch:16},{wch:36},{wch:36},{wch:30}];
-  XLSX.utils.book_append_sheet(wb,'Acompañamiento',ws2);
-  const now=new Date();const fn='DisciplinaComercial_'+now.getFullYear()+String(now.getMonth()+1).padStart(2,'0')+'.xlsx';
-  const wbout=XLSX.write(wb,{bookType:'xlsx',type:'array'});
-  const blob=new Blob([wbout],{type:'application/octet-stream'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');a.href=url;a.download=fn;
-  document.body.appendChild(a);a.click();
-  document.body.removeChild(a);URL.revokeObjectURL(url);
+  // Hoja 3: Ejecutivos
+  csv+=nl+'=== EJECUTIVOS ==='+nl;
+  csv+=['Nombre','Oficina','Fase','Activo'].map(esc).join(sep)+nl;
+  (DB.ejecutivos||[]).forEach(ej=>{
+    csv+=[ej.nombre,gOf(ej.oficina).nombre,ej.fase||'',ej.activo===false?'No':'Sí'].map(esc).join(sep)+nl;
+  });
+  const now=new Date();
+  const fn='DisciplinaComercial_'+now.getFullYear()+String(now.getMonth()+1).padStart(2,'0')+String(now.getDate()).padStart(2,'0')+'.csv';
+  return descargarArchivo(csv,fn,'text/csv;charset=utf-8');
+}
+
+function exportarExcel(){
+  // Intento 1: XLSX (Excel nativo)
+  try{
+    if(typeof XLSX!=='undefined'){
+      const rows=[['Mes','Ejecutivo','Oficina','Fase','Score Total',...DB.criterios.map(c=>c.nombre),'Evaluador','Notas']];
+      const evs=(DB.evaluaciones||[]).filter(e=>e.guardada&&e.score!==null).sort((a,b)=>a.mes.localeCompare(b.mes));
+      evs.forEach(ev=>{
+        const ej=gEj(ev.ejecutivo);const of=gOf(ej.oficina);
+        const cScores=DB.criterios.map((_,ci)=>ev.criterios?ev.criterios[ci]:'');
+        rows.push([mL(ev.mes),ej.nombre,of.nombre,ej.fase||'',ev.score,...cScores,ev.evaluador||'',ev.notas||'']);
+      });
+      const ws=XLSX.utils.aoa_to_sheet(rows);
+      ws['!cols']=[{wch:10},{wch:28},{wch:22},{wch:12},{wch:11},...DB.criterios.map(()=>({wch:14})),{wch:16},{wch:32}];
+      const wb=XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb,'Evaluaciones',ws);
+      const acRows=[['Ejecutivo','Oficina','Fecha','Registrado por','Cumplió anterior','Compromiso anterior','Compromiso nuevo','Notas']];
+      (DB.acompañamientos||[]).sort((a,b)=>a.fecha.localeCompare(b.fecha)).forEach(a=>{
+        const ej=gEj(a.ejecutivo);const of=gOf(ej.oficina);
+        acRows.push([ej.nombre,of.nombre,a.fecha,a.registrado_por,a.cumplio_anterior===null?'—':a.cumplio_anterior?'Sí':'No',a.compromiso_anterior||'',a.compromiso_nuevo,a.notas||'']);
+      });
+      const ws2=XLSX.utils.aoa_to_sheet(acRows);
+      ws2['!cols']=[{wch:28},{wch:20},{wch:12},{wch:16},{wch:16},{wch:36},{wch:36},{wch:30}];
+      XLSX.utils.book_append_sheet(wb,'Acompañamiento',ws2);
+      const now=new Date();const fn='DisciplinaComercial_'+now.getFullYear()+String(now.getMonth()+1).padStart(2,'0')+'.xlsx';
+      const wbout=XLSX.write(wb,{bookType:'xlsx',type:'array',compression:true});
+      const ok=descargarArchivo(new Uint8Array(wbout),fn,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      if(ok)return;
+    }
+  }catch(e){console.error('Error XLSX:',e);}
+  // Intento 2 (fallback): CSV
+  console.log('Excel no disponible, usando CSV...');
+  if(exportarCSV()){
+    alert('Se descargó como CSV (compatible con Excel). Si quieres .xlsx nativo, verifica tu conexión a internet.');
+  }else{
+    alert('No se pudo exportar. Revisa la consola del navegador.');
+  }
 }
 
 // ── CARGA MASIVA EJECUTIVOS ─────────────────────────────────
