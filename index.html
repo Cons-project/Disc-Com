@@ -190,6 +190,14 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFAF8;}
 .btn-tool:hover{background:var(--s2);color:var(--t);}
 .btn-tool.danger{border-color:var(--rd);color:var(--rd);}
 .btn-tool.danger:hover{background:var(--rd2);}
+
+/* Switch toggle */
+.sw{position:relative;display:inline-block;width:36px;height:20px;cursor:pointer;}
+.sw input{opacity:0;width:0;height:0;}
+.sw .sl-x{position:absolute;inset:0;background:#ccc;border-radius:20px;transition:.2s;}
+.sw .sl-x::before{content:'';position:absolute;height:14px;width:14px;left:3px;bottom:3px;background:white;border-radius:50%;transition:.2s;}
+.sw input:checked + .sl-x{background:var(--gn);}
+.sw input:checked + .sl-x::before{transform:translateX(16px);}
 </style>
 </head>
 <body>
@@ -287,8 +295,8 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFAF8;}
     <button class="ntb" id="nb-evolución" onclick="sv('evolución')">Evolución</button>
     <button class="ntb" id="nb-oficinas" onclick="sv('oficinas')">Por oficina</button>
     <button class="ntb" id="nb-acomp" onclick="sv('acomp')">Acompañamiento</button>
-    <button class="ntb" onclick="sv('estrategico')">📊 Estratégico</button>
-    <button class="ntb" onclick="sv('agil')">⚡ Eval. Ágil</button>
+    <button class="ntb" id="nb-estrategico" onclick="sv('estrategico')">📊 Reporte Estratégico</button>
+    <button class="ntb" id="nb-agil" onclick="sv('agil')">⚡ Eval. Ágil</button>
     <button class="ntb" id="nb-admin" onclick="sv('admin')">Administración</button>
     <button class="ntb" id="nb-usuarios" onclick="sv('usuarios')" style="display:none;">Usuarios</button>
   </div>
@@ -431,7 +439,7 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFAF8;}
 
 <!-- Dashboard Estratégico -->
 <div class="vw" id="vw-estrategico">
-  <div class="pt">📊 Dashboard Estratégico</div>
+  <div class="pt">📊 Reporte Estratégico</div>
   <div class="ps">Vista ejecutiva — filtra, compara y descubre patrones de desempeño</div>
 
   <!-- Sub-tabs -->
@@ -445,11 +453,7 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFAF8;}
   <div style="background:var(--surface);border:1px solid var(--bd);border-radius:var(--r);padding:14px 18px;margin-bottom:14px;">
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
       <div><label style="font-size:11px;color:var(--t2);display:block;margin-bottom:5px;">Mes</label>
-        <select class="sel" id="es-mes" onchange="rEstrategico()"></select></div>
-      <div><label style="font-size:11px;color:var(--t2);display:block;margin-bottom:5px;">Región</label>
-        <div class="ms-wrap" id="ms-region"></div></div>
-      <div><label style="font-size:11px;color:var(--t2);display:block;margin-bottom:5px;">Tipo de oficina</label>
-        <div class="ms-wrap" id="ms-tipo"></div></div>
+        <div class="ms-wrap" id="ms-mes"></div></div>
       <div><label style="font-size:11px;color:var(--t2);display:block;margin-bottom:5px;">Oficina</label>
         <div class="ms-wrap" id="ms-oficina"></div></div>
       <div><label style="font-size:11px;color:var(--t2);display:block;margin-bottom:5px;">Ejecutivo</label>
@@ -490,11 +494,11 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFAF8;}
 
     <div style="background:var(--surface);border:1px solid var(--bd);border-radius:var(--r);padding:16px;margin-bottom:16px;">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
-        <div style="font-size:14px;font-weight:600;">📈 Evolución temporal</div>
+        <div style="font-size:14px;font-weight:600;">📈 Evolución por entidad</div>
         <div style="margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
           <label style="font-size:11px;color:var(--t2);">Ver por:</label>
           <select class="sel" id="es-evo-nivel" onchange="rEvoChart()">
-            <option value="region">Región</option><option value="tipo">Tipo oficina</option><option value="oficina">Oficina</option><option value="ejecutivo">Ejecutivo</option>
+            <option value="ejecutivo">Ejecutivo</option><option value="oficina">Oficina</option><option value="region">Región</option><option value="tipo">Tipo oficina</option>
           </select>
           <label style="font-size:11px;color:var(--t2);">Rango:</label>
           <select class="sel" id="es-evo-rango" onchange="rEvoChart()">
@@ -502,8 +506,7 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFAF8;}
           </select>
         </div>
       </div>
-      <div id="es-evo-chart" style="position:relative;overflow-x:auto;"></div>
-      <div id="es-evo-legend" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;font-size:11px;"></div>
+      <div id="es-evo-cards"></div>
     </div>
   </div>
 
@@ -592,6 +595,10 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFAF8;}
     </div>
   </div>
   <div class="as" id="adcr-wrap"><div class="ash"><span class="ast">Criterios y banco de preguntas</span></div><div id="adcr"></div></div>
+  <div class="as" id="adtv-wrap"><div class="ash"><span class="ast">👁 Visibilidad de pestañas</span></div>
+    <div style="padding:10px 16px 14px;font-size:11px;color:var(--t2);">Activa/desactiva qué pestañas son visibles para todos los usuarios. Los cambios se aplican al refrescar la página.</div>
+    <div id="adtv"></div>
+  </div>
   <div class="as" id="adag-wrap"><div class="ash"><span class="ast">⚡ Configurar Evaluación Ágil</span><button class="btn btn-sm" onclick="resetAgilConfig()">Restaurar 15 por defecto</button></div>
     <div style="padding:10px 16px 14px;font-size:11px;color:var(--t2);">Personaliza las 15 preguntas de la evaluación ágil. Puedes elegir evidencias existentes o crear preguntas nuevas. La suma de puntos debe dar 100.</div>
     <div id="adag"></div>
@@ -1156,6 +1163,7 @@ function initApp(){
   roleEl.className='nu-role'+(SESSION.rol==='super_admin'?' sa':'');
   document.getElementById('nb-usuarios').style.display=SESSION.rol==='super_admin'?'':'none';
   showScr('app');
+  if(typeof applyTabsVis==='function')applyTabsVis();
   const _mes=new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0');
   ['dm','emes','ofm'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=_mes;});
   if(USE_SUPABASE&&SB)sbInit();
@@ -1946,8 +1954,8 @@ function mesesDelAno(){
   return out;
 }
 
-const MS_STATE={region:[],tipo:[],oficina:[],ejecutivo:[],fase:[]};
-let ES_OPTIONS={region:[],tipo:[],oficina:[],ejecutivo:[],fase:[]};
+const MS_STATE={mes:[],oficina:[],ejecutivo:[],fase:[]};
+let ES_OPTIONS={mes:[],oficina:[],ejecutivo:[],fase:[]};
 
 function buildMS(id,options){
   const wrap=document.getElementById('ms-'+id);if(!wrap)return;
@@ -1994,8 +2002,7 @@ function filterMS(id,q){
 document.addEventListener('click',function(){document.querySelectorAll('.ms-drop.open').forEach(d=>d.classList.remove('open'));});
 
 function rebuildMS(){
-  buildMS('region',ES_OPTIONS.region);
-  buildMS('tipo',ES_OPTIONS.tipo);
+  buildMS('mes',ES_OPTIONS.mes);
   buildMS('oficina',ES_OPTIONS.oficina);
   buildMS('ejecutivo',ES_OPTIONS.ejecutivo);
   buildMS('fase',ES_OPTIONS.fase);
@@ -2015,7 +2022,7 @@ function renderChips(){
 function removeChip(k,v){const arr=MS_STATE[k];const i=arr.indexOf(v);if(i>=0)arr.splice(i,1);rebuildMS();onEsFilterChange(k);}
 
 function onEsFilterChange(changedKey){
-  if(changedKey==='oficina'||changedKey==='region'||changedKey==='tipo'||changedKey==='fase'){
+  if(changedKey==='oficina'||changedKey==='fase'){
     updateEjecutivoOptions();rebuildMS();
   }
   rEstrategico();rEvoChart();
@@ -2031,9 +2038,6 @@ function updateEjecutivoOptions(){
 function ejecutivosBaseDeFiltros(){
   return DB.ejecutivos.filter(e=>{
     if(e.activo===false)return false;
-    const of=gOf(e.oficina);
-    if(MS_STATE.region.length&&!MS_STATE.region.includes(getRegion(of.nombre)))return false;
-    if(MS_STATE.tipo.length&&!MS_STATE.tipo.includes(getTipoOficina(of.nombre)))return false;
     if(MS_STATE.oficina.length&&!MS_STATE.oficina.includes(e.oficina))return false;
     if(MS_STATE.fase.length&&!MS_STATE.fase.includes(e.fase||''))return false;
     return true;
@@ -2046,20 +2050,19 @@ function ejecutivosFiltrados(){
 }
 
 function clearEsFilters(){
-  MS_STATE.region=[];MS_STATE.tipo=[];MS_STATE.oficina=[];MS_STATE.ejecutivo=[];MS_STATE.fase=[];
+  MS_STATE.mes=[];MS_STATE.oficina=[];MS_STATE.ejecutivo=[];MS_STATE.fase=[];
   updateEjecutivoOptions();rebuildMS();rEstrategico();rEvoChart();
   if(document.getElementById('subview-comparativo').classList.contains('active'))rComparativo();
 }
 
 function initEstrategico(){
-  const ms=document.getElementById('es-mes');
-  if(!ms.options.length){
-    mesesDelAno().forEach(m=>{ms.innerHTML+='<option value="'+m.mes+'">'+m.label+'</option>';});
-    const _now=new Date();ms.value=_now.getFullYear()+'-'+String(_now.getMonth()+1).padStart(2,'0');
+  // Poblar opciones de mes
+  ES_OPTIONS.mes=mesesDelAno().reverse().map(m=>({value:m.mes,label:m.label}));
+  // Por defecto seleccionar el mes actual
+  if(!MS_STATE.mes.length){
+    const _now=new Date();const cur=_now.getFullYear()+'-'+String(_now.getMonth()+1).padStart(2,'0');
+    MS_STATE.mes=[cur];
   }
-  const regs=[...new Set(DB.oficinas.map(o=>getRegion(o.nombre)))].sort();
-  ES_OPTIONS.region=regs.map(r=>({value:r,label:r}));
-  ES_OPTIONS.tipo=['Promotorías','Despachos','Agentes','Otras'].map(t=>({value:t,label:t}));
   ES_OPTIONS.oficina=DB.oficinas.slice().sort((a,b)=>a.nombre.localeCompare(b.nombre)).map(o=>({value:o.id,label:o.nombre}));
   const fases=[...new Set(DB.ejecutivos.map(e=>e.fase).filter(Boolean))].sort();
   ES_OPTIONS.fase=fases.length?fases.map(f=>({value:f,label:f})):[];
@@ -2085,22 +2088,29 @@ function setSubEs(name){
 }
 
 function rEstrategico(){
-  const mes=document.getElementById('es-mes').value;
+  const mesesSel=MS_STATE.mes.length?MS_STATE.mes.slice().sort():[(()=>{const _n=new Date();return _n.getFullYear()+'-'+String(_n.getMonth()+1).padStart(2,'0');})()];
   const ejs=ejecutivosFiltrados();
-  const evMes=DB.evaluaciones.filter(e=>e.mes===mes&&e.guardada&&e.score!==null);
   const ejIds=new Set(ejs.map(e=>e.id));
-  const evs=evMes.filter(e=>ejIds.has(e.ejecutivo));
-  const [yy,mm]=mes.split('-').map(Number);
+  const evs=DB.evaluaciones.filter(e=>mesesSel.includes(e.mes)&&e.guardada&&e.score!==null&&ejIds.has(e.ejecutivo));
+  // Mes anterior = mes anterior al primero seleccionado (cronológicamente)
+  const refMes=mesesSel[mesesSel.length-1];
+  const [yy,mm]=refMes.split('-').map(Number);
   const prevDate=new Date(yy,mm-2,1);
   const mesPrev=prevDate.getFullYear()+'-'+String(prevDate.getMonth()+1).padStart(2,'0');
   const evsPrev=DB.evaluaciones.filter(e=>e.mes===mesPrev&&e.guardada&&e.score!==null&&ejIds.has(e.ejecutivo));
-  const total=ejs.length,evd=evs.length;
+  const total=ejs.length;
+  // Cobertura: ejecutivos con al menos una eval en el periodo
+  const ejsEval=new Set(evs.map(e=>e.ejecutivo));
+  const evd=ejsEval.size;
   const cob=total?Math.round(evd/total*100):0;
   const avg=evs.length?Math.round(evs.reduce((s,e)=>s+e.score,0)/evs.length):0;
   const avgPrev=evsPrev.length?Math.round(evsPrev.reduce((s,e)=>s+e.score,0)/evsPrev.length):0;
   const delta=avg-avgPrev;
-  const sol=evs.filter(e=>e.score>=80).length;
-  const at=evs.filter(e=>e.score<60).length;
+  // Para sólidos/atención: usar promedio por ejecutivo en el periodo
+  const promPorEj={};evs.forEach(e=>{if(!promPorEj[e.ejecutivo])promPorEj[e.ejecutivo]=[];promPorEj[e.ejecutivo].push(e.score);});
+  const ejAvgs=Object.values(promPorEj).map(arr=>arr.reduce((s,v)=>s+v,0)/arr.length);
+  const sol=ejAvgs.filter(s=>s>=80).length;
+  const at=ejAvgs.filter(s=>s<60).length;
   const pctSol=evd?Math.round(sol/evd*100):0;
   const pctAt=evd?Math.round(at/evd*100):0;
   let critDebil={nombre:'—',avg:100};
@@ -2111,21 +2121,23 @@ function rEstrategico(){
     if(a<critDebil.avg)critDebil={nombre:c.nombre,avg:a};
   });
   const arrow=delta>0?'<span style="color:var(--gn);">↑ +'+delta+'</span>':delta<0?'<span style="color:var(--rd);">↓ '+delta+'</span>':'<span style="color:var(--t3);">→ 0</span>';
+  const periodoLabel=mesesSel.length===1?mL(mesesSel[0]):mesesSel.length+' meses';
   document.getElementById('es-kpis').innerHTML=
     '<div class="sc"><div class="sv">'+cob+'%</div><div class="sl">Cobertura</div><div style="font-size:10px;color:var(--t3);margin-top:3px;">'+evd+' de '+total+'</div></div>'+
-    '<div class="sc'+(avg>=80?' g':avg>=60?' a':avg>0?' r':'')+'" ><div class="sv">'+(avg||'—')+'</div><div class="sl">Score promedio</div><div style="font-size:10px;margin-top:3px;">'+arrow+'</div></div>'+
+    '<div class="sc'+(avg>=80?' g':avg>=60?' a':avg>0?' r':'')+'" ><div class="sv">'+(avg||'—')+'</div><div class="sl">Score · '+periodoLabel+'</div><div style="font-size:10px;margin-top:3px;">'+arrow+'</div></div>'+
     '<div class="sc g"><div class="sv">'+pctSol+'%</div><div class="sl">Sólidos (≥80)</div><div style="font-size:10px;color:var(--t3);margin-top:3px;">'+sol+' ejecutivos</div></div>'+
     '<div class="sc r"><div class="sv">'+pctAt+'%</div><div class="sl">Atención (<60)</div><div style="font-size:10px;color:var(--t3);margin-top:3px;">'+at+' ejecutivos</div></div>'+
     '<div class="sc'+(delta>=0?' g':' r')+'"><div class="sv">'+(delta>=0?'+':'')+delta+'</div><div class="sl">Δ vs '+mL(mesPrev)+'</div></div>'+
     '<div class="sc a"><div class="sv" style="font-size:14px;line-height:1.3;">'+critDebil.avg+'%</div><div class="sl" style="font-size:10px;">Criterio más débil</div><div style="font-size:10px;color:var(--t3);margin-top:3px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+critDebil.nombre+'</div></div>';
-  const rank=evs.slice().sort((a,b)=>b.score-a.score);
-  const top=rank.slice(0,10),bot=rank.slice(-10).reverse();
+  // Ranking: promedio por ejecutivo en el periodo
+  const rankItems=Object.entries(promPorEj).map(([id,arr])=>({ejecutivo:id,score:Math.round(arr.reduce((s,v)=>s+v,0)/arr.length)})).sort((a,b)=>b.score-a.score);
+  const top=rankItems.slice(0,10),bot=rankItems.slice(-10).reverse();
   const prevMap={};evsPrev.forEach(e=>{prevMap[e.ejecutivo]=e.score;});
-  function rowHtml(ev,idx){
-    const ej=gEj(ev.ejecutivo);const of=gOf(ej.oficina);
-    const prev=prevMap[ev.ejecutivo];
-    const trd=prev!==undefined?(ev.score>prev?'<span style="color:var(--gn)">↑</span>':ev.score<prev?'<span style="color:var(--rd)">↓</span>':'<span style="color:var(--t3)">→</span>'):'';
-    return'<tr><td style="font-size:10px;color:var(--t3);">'+(idx+1)+'</td><td style="font-weight:500">'+ej.nombre+'</td><td style="font-size:11px;color:var(--t2);">'+of.nombre+'</td><td style="text-align:right;font-weight:600;color:'+sc(ev.score)+'">'+ev.score+'</td><td>'+trd+'</td></tr>';
+  function rowHtml(item,idx){
+    const ej=gEj(item.ejecutivo);const of=gOf(ej.oficina);
+    const prev=prevMap[item.ejecutivo];
+    const trd=prev!==undefined?(item.score>prev?'<span style="color:var(--gn)">↑</span>':item.score<prev?'<span style="color:var(--rd)">↓</span>':'<span style="color:var(--t3)">→</span>'):'';
+    return'<tr><td style="font-size:10px;color:var(--t3);">'+(idx+1)+'</td><td style="font-weight:500">'+ej.nombre+'</td><td style="font-size:11px;color:var(--t2);">'+of.nombre+'</td><td style="text-align:right;font-weight:600;color:'+sc(item.score)+'">'+item.score+'</td><td>'+trd+'</td></tr>';
   }
   document.getElementById('es-top').innerHTML=top.length?top.map((e,i)=>rowHtml(e,i)).join(''):'<tr><td colspan="5" class="empty">Sin datos</td></tr>';
   document.getElementById('es-bottom').innerHTML=bot.length?bot.map((e,i)=>rowHtml(e,i)).join(''):'<tr><td colspan="5" class="empty">Sin datos</td></tr>';
@@ -2167,69 +2179,71 @@ function rEvoChart(){
   for(let i=rango-1;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1);meses.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'));}
   const ejs=ejecutivosFiltrados();const grupos={};
   ejs.forEach(e=>{
-    let k;
-    if(nivel==='region')k=getRegion(gOf(e.oficina).nombre);
-    else if(nivel==='tipo')k=getTipoOficina(gOf(e.oficina).nombre);
-    else if(nivel==='oficina')k=gOf(e.oficina).nombre;
-    else k=e.nombre;
-    if(!grupos[k])grupos[k]={ejs:[]};
-    grupos[k].ejs.push(e.id);
+    let k,kid,sub;
+    if(nivel==='region'){k=getRegion(gOf(e.oficina).nombre);kid='reg:'+k;sub='';}
+    else if(nivel==='tipo'){k=getTipoOficina(gOf(e.oficina).nombre);kid='tipo:'+k;sub='';}
+    else if(nivel==='oficina'){k=gOf(e.oficina).nombre;kid='of:'+e.oficina;sub=getRegion(k);}
+    else{k=e.nombre;kid='ej:'+e.id;sub=gOf(e.oficina).nombre;}
+    if(!grupos[kid])grupos[kid]={label:k,sub,ejs:[]};
+    grupos[kid].ejs.push(e.id);
   });
-  const series=Object.entries(grupos).map(([k,g])=>{
+  const items=Object.entries(grupos).map(([kid,g])=>{
     const ejSet=new Set(g.ejs);
     const puntos=meses.map(m=>{
       const evs=DB.evaluaciones.filter(e=>e.mes===m&&e.guardada&&e.score!==null&&ejSet.has(e.ejecutivo));
       if(!evs.length)return null;
       return Math.round(evs.reduce((s,e)=>s+e.score,0)/evs.length);
     });
-    const avg=puntos.filter(p=>p!==null).reduce((s,v,_,arr)=>s+v/arr.length,0);
-    return{label:k,puntos,avg:avg||0};
-  }).filter(s=>s.puntos.some(p=>p!==null));
-  series.sort((a,b)=>b.avg-a.avg);
-  const topSeries=series.slice(0,5);
-  const W=900,H=280,PT=20,PB=40,PL=40,PR=20;
-  const cW=W-PL-PR,cH=H-PT-PB;
-  const palette=['#1A7A52','#1A4A8A','#8A5C00','#8A1A1A','#4A2A8A'];
-  let svg='<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;min-width:600px;max-width:100%;height:auto;background:var(--bg);border-radius:6px;">';
-  for(let y=0;y<=100;y+=20){
-    const yy=PT+cH-(y/100)*cH;
-    svg+='<line x1="'+PL+'" y1="'+yy+'" x2="'+(PL+cW)+'" y2="'+yy+'" stroke="#ddd" stroke-width="0.5"/>';
-    svg+='<text x="'+(PL-6)+'" y="'+(yy+3)+'" text-anchor="end" font-size="9" fill="#9E9C97" font-family="DM Mono">'+y+'</text>';
-  }
-  meses.forEach((m,i)=>{
-    const x=PL+(i/(meses.length-1||1))*cW;
-    svg+='<text x="'+x+'" y="'+(H-15)+'" text-anchor="middle" font-size="10" fill="#6B6860">'+mL(m)+'</text>';
+    const valid=puntos.filter(p=>p!==null);
+    const avg=valid.length?Math.round(valid.reduce((s,v)=>s+v,0)/valid.length):0;
+    const last=puntos[puntos.length-1];
+    return{kid,label:g.label,sub:g.sub,puntos,avg,last};
+  }).filter(it=>it.puntos.some(p=>p!==null));
+  items.sort((a,b)=>b.avg-a.avg);
+  if(!items.length){document.getElementById('es-evo-cards').innerHTML='<div class="empty">Sin datos para mostrar</div>';return;}
+  let h='';
+  items.forEach(it=>{
+    const lastCol=it.last!==null?sc(it.last):'var(--t3)';
+    const lastLabel=it.last>=80?'Sólida':it.last>=60?'En desarrollo':it.last!==null?'Atención':'Sin eval';
+    h+='<div style="background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:14px 16px;margin-bottom:10px;">';
+    h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:6px;">';
+    h+='<div><div style="font-weight:600;font-size:13px;">'+it.label+'</div>';
+    if(it.sub)h+='<div style="font-size:10px;color:var(--t2);margin-top:1px;">'+it.sub+'</div>';
+    h+='</div>';
+    h+='<span class="badge" style="background:'+(it.last>=80?'var(--gn2)':it.last>=60?'var(--am2)':it.last!==null?'var(--rd2)':'var(--s2)')+';color:'+lastCol+';">'+(it.last!==null?it.last+' — '+lastLabel:lastLabel)+'</span>';
+    h+='</div>';
+    // Bars
+    h+='<div style="display:flex;gap:6px;align-items:flex-end;height:80px;">';
+    it.puntos.forEach((p,i)=>{
+      const pct=p!==null?p:0;
+      const col=p!==null?(p>=80?'#1A7A52':p>=60?'#8A5C00':'#A52A2A'):'var(--s2)';
+      const bg=p!==null?col:'#E8E6E1';
+      h+='<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;">';
+      h+='<div style="font-size:10px;font-weight:600;color:'+col+';">'+(p!==null?p:'—')+'</div>';
+      h+='<div style="width:100%;height:'+Math.max(pct*0.55,3)+'px;background:'+bg+';border-radius:3px 3px 0 0;"></div>';
+      h+='<div style="font-size:9px;color:var(--t3);">'+mL(meses[i]).split(' ')[0]+'</div>';
+      h+='</div>';
+    });
+    h+='</div></div>';
   });
-  topSeries.forEach((s,si)=>{
-    const color=palette[si%palette.length];
-    const pts=s.puntos.map((p,i)=>{
-      if(p===null)return null;
-      const x=PL+(i/(meses.length-1||1))*cW;
-      const y=PT+cH-(p/100)*cH;
-      return{x,y,v:p};
-    }).filter(Boolean);
-    if(pts.length<2)return;
-    const d='M'+pts.map(p=>p.x+','+p.y).join(' L');
-    svg+='<path d="'+d+'" fill="none" stroke="'+color+'" stroke-width="2"/>';
-    pts.forEach(p=>{svg+='<circle cx="'+p.x+'" cy="'+p.y+'" r="3.5" fill="'+color+'"/>';});
-  });
-  svg+='</svg>';
-  document.getElementById('es-evo-chart').innerHTML=svg;
-  document.getElementById('es-evo-legend').innerHTML=topSeries.map((s,i)=>'<div style="display:flex;align-items:center;gap:5px;"><div style="width:14px;height:3px;background:'+palette[i%palette.length]+';border-radius:2px;"></div><span>'+s.label+'</span></div>').join('');
+  document.getElementById('es-evo-cards').innerHTML=h;
 }
 
 function exportEstrategico(){
   const ejs=ejecutivosFiltrados();const ejIds=new Set(ejs.map(e=>e.id));
-  const evs=DB.evaluaciones.filter(e=>e.guardada&&e.score!==null&&ejIds.has(e.ejecutivo)).sort((a,b)=>a.mes.localeCompare(b.mes));
+  const mesesFiltro=MS_STATE.mes;
+  let evs=DB.evaluaciones.filter(e=>e.guardada&&e.score!==null&&ejIds.has(e.ejecutivo));
+  if(mesesFiltro.length)evs=evs.filter(e=>mesesFiltro.includes(e.mes));
+  evs.sort((a,b)=>a.mes.localeCompare(b.mes));
   if(typeof XLSX==='undefined'){alert('SheetJS no disponible');return;}
-  const rows=[['Mes','Ejecutivo','Oficina','Región','Tipo','Fase','Score',...DB.criterios.map(c=>c.nombre),'Evaluador','Notas']];
+  const rows=[['Mes','Ejecutivo','Oficina','Fase','Score',...DB.criterios.map(c=>c.nombre),'Evaluador','Notas']];
   evs.forEach(ev=>{
     const ej=gEj(ev.ejecutivo);const of=gOf(ej.oficina);
     const cS=DB.criterios.map((_,ci)=>ev.criterios?ev.criterios[ci]:'');
-    rows.push([mL(ev.mes),ej.nombre,of.nombre,getRegion(of.nombre),getTipoOficina(of.nombre),ej.fase||'',ev.score,...cS,ev.evaluador||'',ev.notas||'']);
+    rows.push([mL(ev.mes),ej.nombre,of.nombre,ej.fase||'',ev.score,...cS,ev.evaluador||'',ev.notas||'']);
   });
   const ws=XLSX.utils.aoa_to_sheet(rows);
-  ws['!cols']=[{wch:10},{wch:28},{wch:22},{wch:12},{wch:12},{wch:12},{wch:8},...DB.criterios.map(()=>({wch:14})),{wch:16},{wch:30}];
+  ws['!cols']=[{wch:10},{wch:28},{wch:22},{wch:12},{wch:8},...DB.criterios.map(()=>({wch:14})),{wch:16},{wch:30}];
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,'Estratégico',ws);
   const wbout=XLSX.write(wb,{bookType:'xlsx',type:'array',compression:true});
   const blob=new Blob([new Uint8Array(wbout)],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
@@ -2395,7 +2409,7 @@ function exportPDF(modo,id){
     doc.setFontSize(14);doc.setFont(undefined,'bold');doc.text(of.nombre,margin,y);y+=6;
     doc.setFontSize(10);doc.setFont(undefined,'normal');doc.setTextColor(80);
     doc.text(getRegion(of.nombre)+' · '+ejs.length+' ejecutivos',margin,y);y+=10;doc.setTextColor(0);
-    const mes=document.getElementById('es-mes').value;
+    const mes=MS_STATE.mes.length?MS_STATE.mes[MS_STATE.mes.length-1]:(()=>{const _n=new Date();return _n.getFullYear()+'-'+String(_n.getMonth()+1).padStart(2,'0');})();
     const evs=DB.evaluaciones.filter(e=>e.mes===mes&&e.guardada&&e.score!==null&&ejs.find(ej=>ej.id===e.ejecutivo));
     const avg=evs.length?Math.round(evs.reduce((s,e)=>s+e.score,0)/evs.length):0;
     const cob=ejs.length?Math.round(evs.length/ejs.length*100):0;
@@ -2409,7 +2423,7 @@ function exportPDF(modo,id){
   }
   else{
     doc.setFontSize(14);doc.setFont(undefined,'bold');doc.text('Vista global filtrada',margin,y);y+=8;
-    const ejs=ejecutivosFiltrados();const mes=document.getElementById('es-mes').value;
+    const ejs=ejecutivosFiltrados();const mes=MS_STATE.mes.length?MS_STATE.mes[MS_STATE.mes.length-1]:(()=>{const _n=new Date();return _n.getFullYear()+'-'+String(_n.getMonth()+1).padStart(2,'0');})();
     const ejIds=new Set(ejs.map(e=>e.id));
     const evs=DB.evaluaciones.filter(e=>e.mes===mes&&e.guardada&&e.score!==null&&ejIds.has(e.ejecutivo));
     const avg=evs.length?Math.round(evs.reduce((s,e)=>s+e.score,0)/evs.length):0;
@@ -2583,13 +2597,49 @@ function setAgilCrit(i,v){const c=getAgilConfig();c[i].criterio_idx=parseInt(v);
 function setAgilTexto(i,v){const c=getAgilConfig();c[i].texto=v;saveAgilConfig(c);}
 function setAgilPts(i,v){const c=getAgilConfig();c[i].pts=parseInt(v)||1;saveAgilConfig(c);renderAgilConfigAdmin();}
 
-// Hook into rAdmin to also render Ágil config
+// ── Visibilidad de pestañas ────────────────────────────────
+const TABS_DEF=[
+  {id:'dashboard',label:'Dashboard'},
+  {id:'evaluar',label:'Evaluar'},
+  {id:'evolución',label:'Evolución'},
+  {id:'oficinas',label:'Por oficina'},
+  {id:'acomp',label:'Acompañamiento'},
+  {id:'estrategico',label:'📊 Reporte Estratégico'},
+  {id:'agil',label:'⚡ Eval. Ágil'}
+];
+function getTabsVis(){return JSON.parse(localStorage.getItem('dc_tabs_vis')||'null')||{};}
+function setTabVis(id,visible){const v=getTabsVis();v[id]=visible;localStorage.setItem('dc_tabs_vis',JSON.stringify(v));applyTabsVis();}
+function applyTabsVis(){
+  const v=getTabsVis();
+  TABS_DEF.forEach(t=>{
+    const el=document.getElementById('nb-'+t.id);
+    if(!el)return;
+    el.style.display=(v[t.id]===false)?'none':'';
+  });
+}
+function renderTabsVisAdmin(){
+  const v=getTabsVis();
+  let h='';
+  TABS_DEF.forEach(t=>{
+    const vis=v[t.id]!==false;
+    h+='<div style="padding:8px 16px;border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:10px;">';
+    h+='<span style="font-size:12px;flex:1;">'+t.label+'</span>';
+    h+='<label class="sw"><input type="checkbox" '+(vis?'checked':'')+' onchange="setTabVis(\''+t.id+'\',this.checked)"><span class="sl-x"></span></label>';
+    h+='</div>';
+  });
+  document.getElementById('adtv').innerHTML=h;
+}
+
+// Hook into rAdmin to also render Ágil config + tabs visibility
 const _origRAdmin=typeof rAdmin==='function'?rAdmin:null;
 if(_origRAdmin){
   rAdmin=function(){
     _origRAdmin();
+    const isSA=SESSION?.rol==='super_admin';
     const adagWrap=document.getElementById('adag-wrap');
-    if(adagWrap){adagWrap.style.display=SESSION?.rol==='super_admin'?'':'none';if(SESSION?.rol==='super_admin')renderAgilConfigAdmin();}
+    if(adagWrap){adagWrap.style.display=isSA?'':'none';if(isSA)renderAgilConfigAdmin();}
+    const adtvWrap=document.getElementById('adtv-wrap');
+    if(adtvWrap){adtvWrap.style.display=isSA?'':'none';if(isSA)renderTabsVisAdmin();}
   };
 }
 
