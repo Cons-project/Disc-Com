@@ -435,8 +435,8 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFAF8;}
     <button class="chip" id="ac-chip-ok" onclick="acChip('ok')">Al día</button>
   </div>
   <div class="tw">
-    <div class="th2"><span class="tt" id="ac-tl">Ejecutivos con acompañamiento</span></div>
-    <table><thead><tr><th>Ejecutivo</th><th>Oficina</th><th>Sesiones este mes</th><th>Última sesión</th><th>Último compromiso</th><th>Estado</th><th></th></tr></thead><tbody id="ac-tbody"></tbody></table>
+    <div class="th2"><span class="tt" id="ac-tl">Ejecutivos con actividad</span></div>
+    <table><thead><tr><th>Ejecutivo</th><th>Oficina</th><th>Actividad este mes</th><th>Última actividad</th><th>Última evaluación</th><th>Último compromiso</th><th>Estado</th><th></th></tr></thead><tbody id="ac-tbody"></tbody></table>
   </div>
   <div id="ac-historial-wrap" style="display:none;margin-top:20px;">
     <div style="font-size:14px;font-weight:600;margin-bottom:12px;" id="ac-hist-title">Historial</div>
@@ -611,7 +611,7 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFAF8;}
       <button class="btn btn-p btn-sm" onclick="previewBulkEj()" style="margin-top:8px;">Vista previa y agregar</button>
     </div>
   </div>
-  <div class="as" id="adcr-wrap"><div class="ash"><span class="ast">Criterios y banco de preguntas</span></div><div id="adcr"></div></div>
+  <div class="as" id="adcr-wrap"><div class="ash"><span class="ast">⚙ Configurar Evaluación Normal — 3 Layouts</span><button class="btn btn-sm" onclick="resetEvalLayouts()">Restaurar 3 layouts por defecto</button></div><div id="adcr"></div></div>
   <div class="as" id="adtv-wrap"><div class="ash"><span class="ast">👁 Visibilidad de pestañas</span></div>
     <div style="padding:10px 16px 14px;font-size:11px;color:var(--t2);">Activa/desactiva qué pestañas son visibles para todos los usuarios. Los cambios se aplican al refrescar la página.</div>
     <div id="adtv"></div>
@@ -1480,7 +1480,7 @@ function guardar(){
   if(idx>=0)DB.evaluaciones[idx]=obj;else DB.evaluaciones.push(obj);
   save();
   if(USE_SUPABASE)sbSaveEval(obj);
-  alert('Evaluación guardada. Layout '+ES.layout+' · Score: '+s+'/100');
+  alert('Evaluación guardada. Layout '+ES.layout+' · Score: '+s+'/100');if(document.getElementById('vw-acomp')&&document.getElementById('vw-acomp').classList.contains('active'))acRender();
   rD();
 }
 
@@ -1550,16 +1550,91 @@ function rAdmin(){
   let eh='';DB.ejecutivos.forEach(ej=>{eh+='<div class="ai"><input class="ed" value="'+ej.nombre+'" onblur="uEjN(\''+ej.id+'\',this.value)"><select class="sel" onchange="uEjO(\''+ej.id+'\',this.value)">'+DB.oficinas.map(o=>'<option value="'+o.id+'"'+(o.id===ej.oficina?' selected':'')+'>'+o.nombre+'</option>').join('')+'</select><input class="inp" value="'+(ej.fase||'')+'" placeholder="Fase (opcional)" maxlength="30" style="width:140px;" onblur="uEjFase(\''+ej.id+'\',this.value)"><button class="btn btn-sm btn-danger" onclick="dEj(\''+ej.id+'\')">Eliminar</button></div>';});
   document.getElementById('adej').innerHTML=eh||'<div class="empty">Sin ejecutivos</div>';
   if(!isSA)return;
-  let ch='';
-  DB.criterios.forEach((c,ci)=>{
-    let evh='';
-    c.evidencias.forEach((e,ei)=>{
-      const bh=e.tipo==='rotativa'?'<div style="margin:6px 0 2px 20px;"><div style="font-size:11px;color:var(--t3);margin-bottom:4px;display:flex;align-items:center;justify-content:space-between;"><span>Banco rotativo</span><button class="btn btn-sm" onclick="addBI('+ci+','+ei+')">+ Agregar</button></div>'+e.banco.map((b,bi)=>'<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--bd);"><input class="ed" value="'+b+'" onblur="uBI('+ci+','+ei+','+bi+',this.value)" style="flex:1;font-size:12px;"><button class="btn btn-sm" onclick="dBI('+ci+','+ei+','+bi+')" style="color:var(--rd);">x</button></div>').join('')+'</div>':'';
-      evh+='<div style="padding:8px 0 4px;border-bottom:1px solid var(--bd);"><div style="display:flex;align-items:center;gap:8px;"><input class="ed" value="'+e.texto+'" onblur="uEvT('+ci+','+ei+',this.value)" style="flex:1;font-size:13px;"><span class="etag '+e.tipo+'">'+e.tipo+'</span><input type="number" value="'+e.pts+'" min="1" max="20" onblur="uEvP('+ci+','+ei+',this.value)" style="width:44px;text-align:center;border:1px solid var(--bd2);border-radius:4px;padding:3px;font-family:inherit;font-size:12px;background:var(--bg);"><button class="btn btn-sm" onclick="dEv('+ci+','+ei+')" style="color:var(--rd);">x</button></div>'+bh+'</div>';
-    });
-    ch+='<div style="border-bottom:1px solid var(--bd);padding:14px 18px;"><div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;"><input class="ed" value="'+c.nombre+'" onblur="uCN('+ci+',this.value)" style="font-size:14px;font-weight:600;flex:1;"><span style="font-size:12px;color:var(--t2);">Peso:</span><input type="number" value="'+c.peso+'" min="1" max="50" onblur="uCP('+ci+',this.value)" style="width:50px;text-align:center;border:1px solid var(--bd2);border-radius:4px;padding:4px;font-family:inherit;background:var(--bg);"><span style="font-size:12px;color:var(--t2);">pts</span></div>'+evh+'<button class="btn btn-sm" style="margin-top:8px;" onclick="addEv('+ci+')">+ Agregar evidencia</button></div>';
+  renderEvalLayoutsAdmin();
+}
+
+let ADMIN_EVAL_LAYOUT_SEL=1;
+function setAdminEvalLayout(id){ADMIN_EVAL_LAYOUT_SEL=id;renderEvalLayoutsAdmin();}
+
+function renderEvalLayoutsAdmin(){
+  const layouts=getEvalLayouts();
+  const cur=ADMIN_EVAL_LAYOUT_SEL;
+  const preguntas=layouts[cur]?.preguntas||[];
+
+  // Tabs
+  let h='<div style="display:flex;gap:4px;padding:10px 18px 0;border-bottom:1px solid var(--bd);">';
+  [1,2,3].forEach(id=>{
+    const l=layouts[id];if(!l)return;
+    const active=cur===id;
+    h+='<button class="subtab'+(active?' active':'')+'" onclick="setAdminEvalLayout('+id+')">L'+id+' — '+l.nombre+'</button>';
   });
-  document.getElementById('adcr').innerHTML=ch;
+  h+='</div>';
+
+  // Objetivo + suma
+  const totalPts=preguntas.reduce((s,p)=>s+(p.pts||0),0);
+  h+='<div style="padding:12px 18px;background:var(--bg);border-bottom:1px solid var(--bd);font-size:11px;color:var(--t2);">';
+  h+='<strong>Layout '+cur+' — '+layouts[cur].nombre+':</strong> '+layouts[cur].objetivo;
+  h+='</div>';
+  h+='<div style="padding:8px 18px;background:'+(totalPts===100?'var(--gn2)':'var(--am2)')+';color:'+(totalPts===100?'var(--gn)':'var(--am)')+';font-size:11px;font-weight:600;">Suma Layout '+cur+': '+totalPts+'/100 puntos '+(totalPts===100?'✓':'⚠ debe sumar 100')+'</div>';
+
+  // Agrupar preguntas por criterio
+  const porCrit={};
+  preguntas.forEach((p,idx)=>{
+    const ci=p.criterio_idx;
+    if(!porCrit[ci])porCrit[ci]=[];
+    porCrit[ci].push({...p,idx});
+  });
+
+  // Render por criterio (mismo formato visual que la versión anterior)
+  DB.criterios.forEach((c,ci)=>{
+    const qs=porCrit[ci]||[];
+    const pesoCrit=qs.reduce((s,q)=>s+(q.pts||0),0);
+    h+='<div style="border-bottom:1px solid var(--bd);padding:14px 18px;">';
+    h+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">';
+    h+='<span style="font-size:14px;font-weight:600;flex:1;">'+c.nombre+'</span>';
+    h+='<span style="font-size:12px;color:var(--t2);">Peso:</span>';
+    h+='<span style="font-size:13px;font-weight:600;color:'+CC[ci]+';">'+pesoCrit+'</span>';
+    h+='<span style="font-size:12px;color:var(--t2);">pts</span>';
+    h+='</div>';
+
+    qs.forEach(q=>{
+      h+='<div style="padding:8px 0;border-bottom:1px solid var(--bd);">';
+      h+='<div style="display:flex;align-items:center;gap:8px;">';
+      h+='<input class="ed" value="'+(q.texto||'').replace(/"/g,'&quot;')+'" onblur="setEvalLayoutTexto('+q.idx+',this.value)" style="flex:1;font-size:13px;">';
+      h+='<input type="number" value="'+q.pts+'" min="1" max="20" onblur="setEvalLayoutPts('+q.idx+',this.value)" style="width:44px;text-align:center;border:1px solid var(--bd2);border-radius:4px;padding:3px;font-family:inherit;font-size:12px;background:var(--bg);">';
+      h+='<button class="btn btn-sm" onclick="delEvalPregunta('+q.idx+')" style="color:var(--rd);">x</button>';
+      h+='</div>';
+      h+='<div style="display:flex;align-items:center;gap:8px;margin-top:6px;padding-left:0;">';
+      h+='<span style="font-size:10px;color:var(--am);min-width:90px;">💡 Nota evaluador:</span>';
+      h+='<input class="ed" value="'+(q.nota||'').replace(/"/g,'&quot;')+'" onblur="setEvalLayoutNota('+q.idx+',this.value)" placeholder="(opcional) Indicación para el evaluador" style="flex:1;font-size:11px;">';
+      h+='</div>';
+      h+='</div>';
+    });
+
+    h+='<button class="btn btn-sm" style="margin-top:8px;" onclick="addEvalPregunta('+ci+')">+ Agregar pregunta</button>';
+    h+='</div>';
+  });
+
+  document.getElementById('adcr').innerHTML=h;
+}
+
+function setEvalLayoutTexto(i,v){const ls=getEvalLayouts();if(ls[ADMIN_EVAL_LAYOUT_SEL].preguntas[i]){ls[ADMIN_EVAL_LAYOUT_SEL].preguntas[i].texto=v;saveEvalLayouts(ls);}}
+function setEvalLayoutPts(i,v){const ls=getEvalLayouts();if(ls[ADMIN_EVAL_LAYOUT_SEL].preguntas[i]){ls[ADMIN_EVAL_LAYOUT_SEL].preguntas[i].pts=parseInt(v)||1;saveEvalLayouts(ls);renderEvalLayoutsAdmin();}}
+function setEvalLayoutNota(i,v){const ls=getEvalLayouts();if(ls[ADMIN_EVAL_LAYOUT_SEL].preguntas[i]){ls[ADMIN_EVAL_LAYOUT_SEL].preguntas[i].nota=v;saveEvalLayouts(ls);}}
+function addEvalPregunta(ci){
+  const ls=getEvalLayouts();
+  ls[ADMIN_EVAL_LAYOUT_SEL].preguntas.push({texto:'Nueva pregunta',criterio_idx:ci,pts:5,nota:''});
+  saveEvalLayouts(ls);renderEvalLayoutsAdmin();
+}
+function delEvalPregunta(i){
+  if(!confirm('¿Eliminar esta pregunta del layout '+ADMIN_EVAL_LAYOUT_SEL+'?'))return;
+  const ls=getEvalLayouts();
+  ls[ADMIN_EVAL_LAYOUT_SEL].preguntas.splice(i,1);
+  saveEvalLayouts(ls);renderEvalLayoutsAdmin();
+}
+function resetEvalLayouts(){
+  if(!confirm('¿Restaurar los 3 layouts por defecto? Se perderán las personalizaciones.'))return;
+  localStorage.removeItem('dc_eval_layouts');renderEvalLayoutsAdmin();
 }
 
 function uOf(id,v){const l=v.trim();if(!l)return;const d=DB.oficinas.find(o=>o.id!==id&&o.nombre.toLowerCase()===l.toLowerCase());if(d){alert('Ya existe: '+d.nombre);rAdmin();return;}const o=DB.oficinas.find(o=>o.id===id);if(o){o.nombre=l;save();if(USE_SUPABASE)sbSaveOficina(id,l);}}
@@ -1687,37 +1762,64 @@ function acRender(){
   if(of)lista=lista.filter(e=>e.oficina===of);
   if(q)lista=lista.filter(e=>normalize(e.nombre).includes(normalize(q)));
   const acomps=DB.acompañamientos||[];
+  const evals=DB.evaluaciones||[];
+
+  // Helper: actividad combinada por ejecutivo (sesiones + evaluaciones guardadas)
+  function getActividad(ejId){
+    const sess=acomps.filter(a=>a.ejecutivo===ejId).map(a=>({tipo:'sesion',fecha:a.fecha,obj:a}));
+    const evs=evals.filter(e=>e.ejecutivo===ejId&&e.guardada).map(e=>({tipo:'eval',fecha:e.mes+'-28',obj:e}));
+    return sess.concat(evs).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  }
+
   lista=lista.filter(ej=>{
-    const hist=acomps.filter(a=>a.ejecutivo===ej.id).sort((a,b)=>b.fecha.localeCompare(a.fecha));
-    const last=hist[0];
+    const act=getActividad(ej.id);
+    const last=act[0];
     const dias=last?Math.floor((new Date(hoy)-new Date(last.fecha))/(86400000)):999;
     if(acChipVal==='alerta')return dias>14;
     if(acChipVal==='ok')return dias<=14;
     return true;
   });
-  document.getElementById('ac-tl').textContent='Ejecutivos con acompañamiento ('+lista.length+')';
+  document.getElementById('ac-tl').textContent='Ejecutivos con actividad ('+lista.length+')';
   let h='';
   lista.forEach(ej=>{
-    const hist=acomps.filter(a=>a.ejecutivo===ej.id).sort((a,b)=>b.fecha.localeCompare(a.fecha));
-    const enMes=hist.filter(a=>a.fecha.startsWith(mesActual)).length;
-    const last=hist[0];
+    const act=getActividad(ej.id);
+    const enMes=act.filter(a=>a.fecha.startsWith(mesActual)).length;
+    const last=act[0];
     const dias=last?Math.floor((new Date(hoy)-new Date(last.fecha))/(86400000)):null;
-    const estado=dias===null?'<span class="badge bgr">Sin sesiones</span>':dias>14?'<span class="badge br">'+dias+' días sin sesión</span>':'<span class="badge bg">Al día</span>';
-    const uf=last?last.fecha:'—';
-    const uc=last?'<span style="font-size:12px;color:var(--t2);">'+last.compromiso_nuevo.substring(0,50)+(last.compromiso_nuevo.length>50?'...':'')+'</span>':'—';
-    h+='<tr><td style="font-weight:500">'+ej.nombre+'</td><td>'+gOf(ej.oficina).nombre+'</td><td style="font-size:13px;">'+enMes+'</td><td style="font-size:12px;color:var(--t2);">'+uf+'</td><td>'+uc+'</td><td>'+estado+'</td><td><button class="btn btn-sm" onclick="acVerHist(\''+ej.id+'\')">Ver historial</button></td></tr>';
+    const estado=dias===null?'<span class="badge bgr">Sin actividad</span>':dias>14?'<span class="badge br">'+dias+' días sin actividad</span>':'<span class="badge bg">Al día</span>';
+    const uf=last?last.fecha+' <span style="font-size:10px;color:var(--t3);">('+(last.tipo==='eval'?'Eval':'Sesión')+')</span>':'—';
+
+    // Última evaluación específica
+    const ultEval=evals.filter(e=>e.ejecutivo===ej.id&&e.guardada&&e.score!==null).sort((a,b)=>b.mes.localeCompare(a.mes))[0];
+    const ueCell=ultEval?'<span style="font-size:11px;">'+mL(ultEval.mes)+'</span> <span style="font-size:10px;color:'+sc(ultEval.score)+';font-weight:600;">'+ultEval.score+'</span>'+(ultEval.layout?' <span style="font-size:9px;color:var(--t3);">L'+ultEval.layout+'</span>':''):'<span style="color:var(--t3);">—</span>';
+
+    // Último compromiso (de sesión más reciente)
+    const lastSess=acomps.filter(a=>a.ejecutivo===ej.id).sort((a,b)=>b.fecha.localeCompare(a.fecha))[0];
+    const uc=lastSess?'<span style="font-size:12px;color:var(--t2);">'+lastSess.compromiso_nuevo.substring(0,50)+(lastSess.compromiso_nuevo.length>50?'...':'')+'</span>':'<span style="color:var(--t3);">—</span>';
+
+    h+='<tr><td style="font-weight:500">'+ej.nombre+'</td><td>'+gOf(ej.oficina).nombre+'</td><td style="font-size:13px;">'+enMes+'</td><td style="font-size:11px;color:var(--t2);">'+uf+'</td><td>'+ueCell+'</td><td>'+uc+'</td><td>'+estado+'</td><td><button class="btn btn-sm" onclick="acVerHist(\''+ej.id+'\')">Ver historial</button></td></tr>';
   });
-  document.getElementById('ac-tbody').innerHTML=h||'<tr><td colspan="7" class="empty">Sin resultados</td></tr>';
+  document.getElementById('ac-tbody').innerHTML=h||'<tr><td colspan="8" class="empty">Sin resultados</td></tr>';
 }
 function acVerHist(ejId){
   const ej=gEj(ejId);
-  const hist=(DB.acompañamientos||[]).filter(a=>a.ejecutivo===ejId).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  const sess=(DB.acompañamientos||[]).filter(a=>a.ejecutivo===ejId).map(a=>({tipo:'sesion',fecha:a.fecha,obj:a}));
+  const evs=(DB.evaluaciones||[]).filter(e=>e.ejecutivo===ejId&&e.guardada).map(e=>({tipo:'eval',fecha:e.mes+'-28',obj:e}));
+  const hist=sess.concat(evs).sort((a,b)=>b.fecha.localeCompare(a.fecha));
   document.getElementById('ac-hist-title').textContent='Historial — '+ej.nombre;
   let h='';
-  if(!hist.length){h='<div class="empty">Sin sesiones registradas</div>';}
-  else{hist.forEach(a=>{
-    const c=a.cumplio_anterior===null?'':a.cumplio_anterior?'<span class="badge bg" style="font-size:10px;">Cumplió</span>':'<span class="badge br" style="font-size:10px;">No cumplió</span>';
-    h+='<div style="background:var(--surface);border:1px solid var(--bd);border-radius:var(--rs);padding:12px 14px;margin-bottom:8px;"><div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;"><span style="font-size:12px;font-weight:500;">'+a.fecha+'</span>'+c+'<span style="font-size:11px;color:var(--t3);margin-left:auto;">'+a.registrado_por+'</span></div>'+(a.compromiso_anterior?'<div style="font-size:11px;color:var(--t3);margin-bottom:4px;">Compromiso anterior: '+a.compromiso_anterior+'</div>':'')+'<div style="font-size:13px;color:var(--t);"><b style="font-weight:500;font-size:11px;color:var(--t2);">Compromiso: </b>'+a.compromiso_nuevo+'</div>'+(a.notas?'<div style="font-size:11px;color:var(--t3);margin-top:4px;">'+a.notas+'</div>':'')+'</div>';
+  if(!hist.length){h='<div class="empty">Sin actividad registrada</div>';}
+  else{hist.forEach(item=>{
+    if(item.tipo==='sesion'){
+      const a=item.obj;
+      const c=a.cumplio_anterior===null?'':a.cumplio_anterior?'<span class="badge bg" style="font-size:10px;">Cumplió</span>':'<span class="badge br" style="font-size:10px;">No cumplió</span>';
+      h+='<div style="background:var(--surface);border:1px solid var(--bd);border-left:3px solid var(--acc);border-radius:var(--rs);padding:12px 14px;margin-bottom:8px;"><div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;"><span style="font-size:10px;font-weight:600;color:var(--acc);text-transform:uppercase;">📋 Sesión</span><span style="font-size:12px;font-weight:500;">'+a.fecha+'</span>'+c+'<span style="font-size:11px;color:var(--t3);margin-left:auto;">'+a.registrado_por+'</span></div>'+(a.compromiso_anterior?'<div style="font-size:11px;color:var(--t3);margin-bottom:4px;">Compromiso anterior: '+a.compromiso_anterior+'</div>':'')+'<div style="font-size:13px;"><b style="font-weight:500;font-size:11px;color:var(--t2);">Compromiso: </b>'+a.compromiso_nuevo+'</div>'+(a.notas?'<div style="font-size:11px;color:var(--t3);margin-top:4px;">'+a.notas+'</div>':'')+'</div>';
+    }else{
+      const e=item.obj;
+      const lyt=e.layout||e.layout_id;
+      const lytLbl=lyt?'L'+lyt+(lyt===1?' Fundamentos':lyt===2?' Aplicación':' Impacto'):'(histórica)';
+      h+='<div style="background:var(--surface);border:1px solid var(--bd);border-left:3px solid '+sc(e.score)+';border-radius:var(--rs);padding:12px 14px;margin-bottom:8px;"><div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;"><span style="font-size:10px;font-weight:600;color:'+sc(e.score)+';text-transform:uppercase;">📊 Evaluación</span><span style="font-size:12px;font-weight:500;">'+mL(e.mes)+'</span><span style="font-size:11px;color:var(--t3);">'+lytLbl+'</span><span style="font-size:13px;font-weight:600;color:'+sc(e.score)+';margin-left:auto;">'+e.score+'/100</span></div>'+(e.notas?'<div style="font-size:12px;color:var(--t);">'+e.notas+'</div>':'<div style="font-size:11px;color:var(--t3);font-style:italic;">Sin notas</div>')+'<div style="font-size:10px;color:var(--t3);margin-top:6px;">'+e.evaluador+'</div></div>';
+    }
   });}
   document.getElementById('ac-hist-list').innerHTML=h;
   document.getElementById('ac-historial-wrap').style.display='block';
@@ -1910,20 +2012,36 @@ function exportarCSV(){
 }
 
 function exportarExcel(){
-  // Intento 1: XLSX (Excel nativo)
   try{
     if(typeof XLSX!=='undefined'){
-      const rows=[['Mes','Ejecutivo','Oficina','Fase','Score Total',...DB.criterios.map(c=>c.nombre),'Evaluador','Notas']];
+      // Hoja 1: Evaluaciones normales (con layout)
+      const rows=[['Mes','Ejecutivo','Oficina','Fase','Layout','Score Total',...DB.criterios.map(c=>c.nombre),'Evaluador','Notas']];
       const evs=(DB.evaluaciones||[]).filter(e=>e.guardada&&e.score!==null).sort((a,b)=>a.mes.localeCompare(b.mes));
       evs.forEach(ev=>{
         const ej=gEj(ev.ejecutivo);const of=gOf(ej.oficina);
         const cScores=DB.criterios.map((_,ci)=>ev.criterios?ev.criterios[ci]:'');
-        rows.push([mL(ev.mes),ej.nombre,of.nombre,ej.fase||'',ev.score,...cScores,ev.evaluador||'',ev.notas||'']);
+        const lyt=ev.layout||ev.layout_id;
+        const lytLbl=lyt?'L'+lyt+(lyt===1?' Fundamentos':lyt===2?' Aplicación':' Impacto'):'(histórica)';
+        rows.push([mL(ev.mes),ej.nombre,of.nombre,ej.fase||'',lytLbl,ev.score,...cScores,ev.evaluador||'',ev.notas||'']);
       });
       const ws=XLSX.utils.aoa_to_sheet(rows);
-      ws['!cols']=[{wch:10},{wch:28},{wch:22},{wch:12},{wch:11},...DB.criterios.map(()=>({wch:14})),{wch:16},{wch:32}];
+      ws['!cols']=[{wch:10},{wch:28},{wch:22},{wch:12},{wch:18},{wch:11},...DB.criterios.map(()=>({wch:14})),{wch:16},{wch:32}];
       const wb=XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb,'Evaluaciones',ws);
+
+      // Hoja 2: Evaluaciones Ágiles
+      const agRows=[['Mes','Ejecutivo','Oficina','Fase','Layout','Score','Evaluador','Fecha','Comentarios']];
+      (DB.evaluacionesAgiles||[]).sort((a,b)=>a.mes.localeCompare(b.mes)).forEach(a=>{
+        const ej=gEj(a.ejecutivo);if(!ej)return;const of=gOf(ej.oficina);
+        const lyt=a.layout||a.layout_id||1;
+        const lytLbl='L'+lyt+(lyt===1?' Fundamentos':lyt===2?' Aplicación':' Impacto');
+        agRows.push([mL(a.mes),ej.nombre,of.nombre,ej.fase||'',lytLbl,a.score,a.evaluador||'',(a.fecha||'').split('T')[0],a.comentarios||'']);
+      });
+      const wsAg=XLSX.utils.aoa_to_sheet(agRows);
+      wsAg['!cols']=[{wch:10},{wch:28},{wch:22},{wch:12},{wch:18},{wch:8},{wch:16},{wch:12},{wch:40}];
+      XLSX.utils.book_append_sheet(wb,'Evaluaciones Ágiles',wsAg);
+
+      // Hoja 3: Acompañamiento
       const acRows=[['Ejecutivo','Oficina','Fecha','Registrado por','Cumplió anterior','Compromiso anterior','Compromiso nuevo','Notas']];
       (DB.acompañamientos||[]).sort((a,b)=>a.fecha.localeCompare(b.fecha)).forEach(a=>{
         const ej=gEj(a.ejecutivo);const of=gOf(ej.oficina);
@@ -1932,19 +2050,16 @@ function exportarExcel(){
       const ws2=XLSX.utils.aoa_to_sheet(acRows);
       ws2['!cols']=[{wch:28},{wch:20},{wch:12},{wch:16},{wch:16},{wch:36},{wch:36},{wch:30}];
       XLSX.utils.book_append_sheet(wb,'Acompañamiento',ws2);
+
       const now=new Date();const fn='DisciplinaComercial_'+now.getFullYear()+String(now.getMonth()+1).padStart(2,'0')+'.xlsx';
       const wbout=XLSX.write(wb,{bookType:'xlsx',type:'array',compression:true});
       const ok=descargarArchivo(new Uint8Array(wbout),fn,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       if(ok)return;
     }
   }catch(e){console.error('Error XLSX:',e);}
-  // Intento 2 (fallback): CSV
   console.log('Excel no disponible, usando CSV...');
-  if(exportarCSV()){
-    alert('Se descargó como CSV (compatible con Excel). Si quieres .xlsx nativo, verifica tu conexión a internet.');
-  }else{
-    alert('No se pudo exportar. Revisa la consola del navegador.');
-  }
+  if(exportarCSV()){alert('Se descargó como CSV (compatible con Excel).');}
+  else{alert('No se pudo exportar. Revisa la consola del navegador.');}
 }
 
 // ── CARGA MASIVA EJECUTIVOS ─────────────────────────────────
