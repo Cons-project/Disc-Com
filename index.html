@@ -558,6 +558,15 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFAF8;}
     </div>
   </div>
 
+  <div id="ag-layout-bar" style="display:none;background:var(--surface);border:1px solid var(--bd);border-radius:var(--r);padding:14px 18px;margin-bottom:14px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+      <div style="font-size:12px;color:var(--t2);">Layout de preguntas <span id="ag-layout-suggest" style="font-size:11px;color:var(--am);margin-left:6px;"></span></div>
+      <div style="font-size:10px;color:var(--t3);" id="ag-layout-meta"></div>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;" id="ag-layout-btns"></div>
+    <div style="font-size:11px;color:var(--t2);margin-top:8px;" id="ag-layout-desc"></div>
+  </div>
+
   <div id="ag-wrap" style="display:none;">
     <div class="ss">
       <div><div class="sn" id="ag-sn" style="color:var(--t3);">0</div><div style="font-size:11px;color:var(--t2);margin-top:2px;">puntos de 100</div>
@@ -599,8 +608,8 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFAF8;}
     <div style="padding:10px 16px 14px;font-size:11px;color:var(--t2);">Activa/desactiva qué pestañas son visibles para todos los usuarios. Los cambios se aplican al refrescar la página.</div>
     <div id="adtv"></div>
   </div>
-  <div class="as" id="adag-wrap"><div class="ash"><span class="ast">⚡ Configurar Evaluación Ágil</span><button class="btn btn-sm" onclick="resetAgilConfig()">Restaurar 15 por defecto</button></div>
-    <div style="padding:10px 16px 14px;font-size:11px;color:var(--t2);">Personaliza las 15 preguntas de la evaluación ágil. Puedes elegir evidencias existentes o crear preguntas nuevas. La suma de puntos debe dar 100.</div>
+  <div class="as" id="adag-wrap"><div class="ash"><span class="ast">⚡ Configurar Evaluación Ágil — 3 Layouts</span><button class="btn btn-sm" onclick="resetAgilConfig()">Restaurar 3 layouts por defecto</button></div>
+    <div style="padding:10px 16px 14px;font-size:11px;color:var(--t2);">3 layouts de 15 preguntas (suma 100 c/u). Se asignan automáticamente según evaluación #1, #2, #3+ y luego ciclan. Personaliza preguntas, puntos y notas para el evaluador.</div>
     <div id="adag"></div>
   </div>
 </div>
@@ -1187,7 +1196,7 @@ async function sbInit(){
     // MVP3: Load Ágil evaluations
     try{
       const {data:ags}=await SB.from('evaluaciones_agiles').select('*');
-      if(ags&&ags.length){DB.evaluacionesAgiles=ags.map(a=>({id:a.id,ejecutivo:a.ejecutivo_id,mes:a.mes,score:a.score,checks:a.checks||[],comentarios:a.comentarios||'',evaluador:a.evaluador||'',fecha:a.fecha}));}
+      if(ags&&ags.length){DB.evaluacionesAgiles=ags.map(a=>({id:a.id,ejecutivo:a.ejecutivo_id,mes:a.mes,score:a.score,checks:a.checks||[],comentarios:a.comentarios||'',evaluador:a.evaluador||'',fecha:a.fecha,layout:a.layout_id||1,layout_id:a.layout_id||1}));}
       else DB.evaluacionesAgiles=[];
     }catch(e){console.log('Tabla evaluaciones_agiles no disponible aún. Ejecuta el SQL de migración.');DB.evaluacionesAgiles=DB.evaluacionesAgiles||[];}
     save();rD();lES();
@@ -2438,32 +2447,95 @@ function exportPDF(modo,id){
 // MVP2 — EVALUACIÓN ÁGIL
 // ══════════════════════════════════════════════════════════
 
-const AGIL_DEFAULT=[
-  {texto:'Sabe su % de cumplimiento al presupuesto del mes (en $ y %)',criterio_idx:0,pts:7},
-  {texto:'Identifica los agentes con mayor decremento vs año anterior',criterio_idx:0,pts:7},
-  {texto:'Tomó acción concreta basada en un dato esta semana',criterio_idx:0,pts:6},
-  {texto:'Sabe número exacto de agentes activos hoy',criterio_idx:1,pts:7},
-  {texto:'Sabe qué agentes no le han emitido en el mes/año',criterio_idx:1,pts:7},
-  {texto:'Ejecutó acción de reactivación en los últimos 15 días',criterio_idx:1,pts:6},
-  {texto:'Tiene negocios solo vigentes en las tuberías',criterio_idx:2,pts:5},
-  {texto:'Ha enviado al BOT folios para cerrar este mes',criterio_idx:2,pts:4},
-  {texto:'Reunión con gerente esta semana ya ocurrió o agendada',criterio_idx:3,pts:6},
-  {texto:'Planes de acción de reunión actualizados con su estatus',criterio_idx:3,pts:5},
-  {texto:'Proyección documentada con negocios específicos a cerrar',criterio_idx:4,pts:10},
-  {texto:'Planes de acción específicos si proyección < 100%',criterio_idx:4,pts:10},
-  {texto:'Plan de visitas documentado de la semana actual',criterio_idx:5,pts:7},
-  {texto:'Cada visita planeada tiene objetivo definido',criterio_idx:5,pts:7},
-  {texto:'Liga visitas con data de algún dashboard',criterio_idx:5,pts:6}
-];
+// 3 LAYOUTS: 1=Fundamentos, 2=Aplicación, 3=Impacto
+const AGIL_LAYOUTS_DEFAULT={
+  1:{
+    nombre:'Fundamentos',
+    descripcion:'Mide si el ejecutivo tiene los procesos en su lugar y conoce los conceptos básicos. Sugerido para 1ra evaluación.',
+    preguntas:[
+      {texto:'Sabe su % de cumplimiento al presupuesto del mes (en $ y %) y desglosado por tipo de negocio',criterio_idx:0,pts:7,nota:'Pedir que muestre el dashboard o reporte donde lo consulta'},
+      {texto:'Identifica los agentes con mayor decremento vs año anterior',criterio_idx:0,pts:7,nota:'Validar que pueda nombrarlos sin consultar el reporte'},
+      {texto:'Tomó acción concreta basada en un dato del tablero esta semana, ¿cuál? Documentar',criterio_idx:0,pts:6,nota:'La acción debe ser específica, no genérica ("hablé con un agente" no cuenta)'},
+      {texto:'Sabe número exacto de agentes activos hoy',criterio_idx:1,pts:7,nota:''},
+      {texto:'Sabe qué agentes no le han emitido en el mes/año',criterio_idx:1,pts:7,nota:''},
+      {texto:'Ejecutó acción de reactivación en los últimos 15 días, está documentada',criterio_idx:1,pts:6,nota:'Pedir evidencia documental (correo, mensaje, registro en CRM)'},
+      {texto:'Tiene negocios solo vigentes en las tuberías',criterio_idx:2,pts:5,nota:'Revisar que no haya negocios vencidos sin actualizar'},
+      {texto:'Ha enviado al BOT folios para cerrar este mes',criterio_idx:2,pts:4,nota:''},
+      {texto:'Reunión con gerente esta semana ya ocurrió o agendada, mostrar evidencia',criterio_idx:3,pts:6,nota:''},
+      {texto:'Planes de acción de reunión actualizados con su estatus',criterio_idx:3,pts:5,nota:'Pedir mostrar el documento o herramienta donde los registra'},
+      {texto:'Proyección documentada con negocios específicos a cerrar, en los campos correctos del reporte',criterio_idx:4,pts:10,nota:'Validar que los negocios estén correctamente capturados, no improvisados'},
+      {texto:'Planes de acción específicos si proyección < 100%, documentados',criterio_idx:4,pts:10,nota:''},
+      {texto:'Plan de visitas documentado de la semana actual, pedir evidencia',criterio_idx:5,pts:7,nota:''},
+      {texto:'Cada visita planeada tiene objetivo definido, pedir evidencia',criterio_idx:5,pts:7,nota:''},
+      {texto:'Liga visitas con data de algún dashboard, lo sabe explicar',criterio_idx:5,pts:6,nota:'Que explique la conexión, no solo lo afirme'}
+    ]
+  },
+  2:{
+    nombre:'Aplicación',
+    descripcion:'Mide si el ejecutivo está usando la información para tomar decisiones y modificar su práctica. Sugerido para 2da evaluación.',
+    preguntas:[
+      {texto:'Identifica los productos con mayor caída en utilidad y el ramo más afectado, ¿qué hará al respecto?',criterio_idx:0,pts:7,nota:'Validar que la respuesta incluya una acción, no solo el dato'},
+      {texto:'Modificó su estrategia o agenda esta semana basado en algún dato del tablero, ¿cuál y cómo?',criterio_idx:0,pts:7,nota:'El cambio debe ser concreto y trazable (de A a B con motivo)'},
+      {texto:'Conoce los 3 agentes con mejor cumplimiento del mes y qué los hace destacar',criterio_idx:0,pts:6,nota:''},
+      {texto:'Sabe cuántos agentes están en no-emisión por más de 60 días y qué plan tiene para cada uno',criterio_idx:1,pts:7,nota:'Pedir que mencione al menos 3 casos puntuales con plan'},
+      {texto:'Tiene segmentado a sus agentes por nivel de producción y prioriza acompañamiento diferenciado',criterio_idx:1,pts:7,nota:'Validar segmentación documentada'},
+      {texto:'Resultado medible de alguna reactivación reciente: el agente ya emitió o tiene cita programada',criterio_idx:1,pts:6,nota:''},
+      {texto:'Las tuberías están actualizadas con fecha de seguimiento próxima, sin negocios estancados',criterio_idx:2,pts:5,nota:'Revisar negocios sin actualización mayor a 15 días'},
+      {texto:'Filtra y analiza tuberías por etapa, no solo las consulta de forma general',criterio_idx:2,pts:4,nota:'Pedir que demuestre el filtro frente al evaluador'},
+      {texto:'Llega a la reunión con gerente con agenda propia y propuestas, no solo a reportar',criterio_idx:3,pts:6,nota:'Validar que la última reunión haya tenido este formato'},
+      {texto:'Cierra cada reunión con compromisos específicos y los cumple antes de la siguiente',criterio_idx:3,pts:5,nota:'Cruzar compromisos anteriores vs cumplimiento real'},
+      {texto:'La proyección del mes anterior se cumplió (≥90%) y sabe explicar las desviaciones puntuales',criterio_idx:4,pts:10,nota:'Pedir comparativo proyectado vs real con explicación'},
+      {texto:'Su proyección actual incluye negocios diversificados (no concentrados en 1-2 agentes o ramos)',criterio_idx:4,pts:10,nota:'Validar distribución de la cartera proyectada'},
+      {texto:'Las visitas de la semana pasada generaron acciones de seguimiento documentadas',criterio_idx:5,pts:7,nota:''},
+      {texto:'Prioriza visitas en función del impacto potencial al presupuesto, no por proximidad o costumbre',criterio_idx:5,pts:7,nota:'Pedir criterio de priorización explícito'},
+      {texto:'Ajusta el plan de visitas semanalmente con base en hallazgos del mes',criterio_idx:5,pts:6,nota:''}
+    ]
+  },
+  3:{
+    nombre:'Impacto',
+    descripcion:'Mide si la disciplina está generando resultados y si el ejecutivo anticipa problemas. Sugerido para 3ra evaluación en adelante.',
+    preguntas:[
+      {texto:'Sus decisiones del trimestre se reflejan en mejora medible del cumplimiento o del mix de cartera',criterio_idx:0,pts:7,nota:'Pedir indicador antes/después con métrica clara'},
+      {texto:'Anticipa tendencias del mes con base en datos parciales (ej. proyección a día 10 vs cierre real)',criterio_idx:0,pts:7,nota:'Validar precisión de proyecciones previas'},
+      {texto:'Ha generado al menos un análisis propio (no estándar del tablero) que llevó a una decisión comercial',criterio_idx:0,pts:6,nota:''},
+      {texto:'Tiene casos concretos de agentes reactivados que ya emiten de forma consistente',criterio_idx:1,pts:7,nota:'Pedir mínimo 2 ejemplos con métrica antes/después'},
+      {texto:'Identifica patrones de riesgo de deserción en agentes antes que los muestre el reporte',criterio_idx:1,pts:7,nota:'Validar con un caso reciente identificado proactivamente'},
+      {texto:'Sus acciones de reactivación tienen tasa de éxito medible (>30%)',criterio_idx:1,pts:6,nota:'Pedir cálculo: reactivados / intentos'},
+      {texto:'La conversión de su tubería ha mejorado mes a mes en los últimos 3 meses',criterio_idx:2,pts:5,nota:'Pedir comparativo mensual de tasa de cierre'},
+      {texto:'Identifica cuellos de botella recurrentes en sus tuberías y los aborda sistémicamente',criterio_idx:2,pts:4,nota:''},
+      {texto:'Las decisiones tomadas en reuniones generan resultados visibles en el siguiente reporte',criterio_idx:3,pts:6,nota:''},
+      {texto:'Lleva un seguimiento longitudinal de compromisos: tasa de cumplimiento >80%',criterio_idx:3,pts:5,nota:'Pedir tracker o registro de compromisos cumplidos vs totales'},
+      {texto:'Sus proyecciones de los últimos 3 meses se cumplieron con desviación menor al 10%',criterio_idx:4,pts:10,nota:'Validar histórico de 3 meses'},
+      {texto:'Anticipa riesgos a la proyección con más de 10 días de antelación y los comunica formalmente',criterio_idx:4,pts:10,nota:'Pedir ejemplo reciente con fecha de comunicación'},
+      {texto:'Sus visitas se conectan con cierres específicos: puede trazar visita → negocio cerrado',criterio_idx:5,pts:7,nota:'Pedir mínimo 2 casos del último trimestre'},
+      {texto:'Las visitas ajustan estrategia del agente: hay cambios documentados en comportamiento post-visita',criterio_idx:5,pts:7,nota:''},
+      {texto:'Su plan de visitas incorpora aprendizajes de visitas pasadas, no es plantilla repetida',criterio_idx:5,pts:6,nota:''}
+    ]
+  }
+};
 
-function getAgilConfig(){
-  const c=JSON.parse(localStorage.getItem('dc_agil_config')||'null');
-  return c||AGIL_DEFAULT.slice();
+function getAgilLayouts(){
+  const saved=JSON.parse(localStorage.getItem('dc_agil_layouts')||'null');
+  if(saved&&saved[1]&&saved[2]&&saved[3])return saved;
+  return JSON.parse(JSON.stringify(AGIL_LAYOUTS_DEFAULT));
 }
-function saveAgilConfig(c){localStorage.setItem('dc_agil_config',JSON.stringify(c));}
-function resetAgilConfig(){if(!confirm('¿Restaurar las 15 preguntas por defecto?'))return;localStorage.removeItem('dc_agil_config');rAdmin();}
+function saveAgilLayouts(layouts){localStorage.setItem('dc_agil_layouts',JSON.stringify(layouts));}
+function resetAgilLayouts(){if(!confirm('¿Restaurar los 3 layouts por defecto? Se perderán las personalizaciones.'))return;localStorage.removeItem('dc_agil_layouts');renderAgilConfigAdmin();}
 
-let AS={c:[]}; // ágil state
+// Helper para mantener compatibilidad con código anterior
+function getAgilConfig(layoutId){
+  const ls=getAgilLayouts();
+  const id=layoutId||AS.layout||1;
+  return ls[id]?ls[id].preguntas:AGIL_LAYOUTS_DEFAULT[1].preguntas.slice();
+}
+function saveAgilConfig(layoutId,preguntas){
+  const ls=getAgilLayouts();
+  if(!ls[layoutId])ls[layoutId]={nombre:'Layout '+layoutId,descripcion:'',preguntas:[]};
+  ls[layoutId].preguntas=preguntas;
+  saveAgilLayouts(ls);
+}
+
+let AS={c:[],layout:1}; // ágil state with layout
 
 function initAgil(){
   const sel=document.getElementById('ag-ej');
@@ -2477,42 +2549,108 @@ function initAgil(){
 
 async function lAgil(){
   const ejId=document.getElementById('ag-ej').value;
-  if(!ejId){document.getElementById('ag-wrap').style.display='none';document.getElementById('ag-empty').style.display='block';return;}
+  if(!ejId){document.getElementById('ag-wrap').style.display='none';document.getElementById('ag-layout-bar').style.display='none';document.getElementById('ag-empty').style.display='block';return;}
   document.getElementById('ag-empty').style.display='none';
   document.getElementById('ag-wrap').style.display='block';
-  const config=getAgilConfig();
-  AS.c=config.map(()=>false);
+  document.getElementById('ag-layout-bar').style.display='block';
+
   const mes=document.getElementById('ag-mes').value;
-  // Cargar desde Supabase si está habilitado
+
+  // Determinar layout sugerido por número de evaluaciones previas del ejecutivo
+  let prevCount=0;
+  let savedLayout=null;
+  if(USE_SUPABASE&&SB){
+    try{
+      const {data}=await SB.from('evaluaciones_agiles').select('mes,layout_id').eq('ejecutivo_id',ejId);
+      if(data){prevCount=data.filter(d=>d.mes<mes).length;const ex=data.find(d=>d.mes===mes);if(ex)savedLayout=ex.layout_id;}
+    }catch(e){
+      const all=(DB.evaluacionesAgiles||[]).filter(e=>e.ejecutivo===ejId);
+      prevCount=all.filter(d=>d.mes<mes).length;
+      const ex=all.find(d=>d.mes===mes);if(ex)savedLayout=ex.layout||ex.layout_id;
+    }
+  }else{
+    const all=(DB.evaluacionesAgiles||[]).filter(e=>e.ejecutivo===ejId);
+    prevCount=all.filter(d=>d.mes<mes).length;
+    const ex=all.find(d=>d.mes===mes);if(ex)savedLayout=ex.layout||ex.layout_id;
+  }
+
+  // Layout sugerido: ciclo 1→2→3→1→2→3...
+  const sugerido=(prevCount%3)+1;
+  AS.layoutSugerido=sugerido;
+  AS.layout=savedLayout||sugerido;
+
+  renderLayoutBar();
+  await loadAgilForMonth();
+}
+
+function renderLayoutBar(){
+  const layouts=getAgilLayouts();
+  const cur=AS.layout;
+  const sug=AS.layoutSugerido;
+  let h='';
+  [1,2,3].forEach(id=>{
+    const l=layouts[id];if(!l)return;
+    const active=cur===id;
+    h+='<button class="btn-tool'+(active?'':'')+'" onclick="cambiarLayout('+id+')" style="'+(active?'background:var(--acc);color:#fff;border-color:var(--acc);':'')+'">';
+    h+='L'+id+' — '+l.nombre;
+    if(sug===id&&!active)h+=' <span style="font-size:9px;background:var(--am2);color:var(--am);padding:1px 5px;border-radius:8px;margin-left:4px;">sugerido</span>';
+    h+='</button>';
+  });
+  document.getElementById('ag-layout-btns').innerHTML=h;
+  document.getElementById('ag-layout-desc').textContent=layouts[cur]?.descripcion||'';
+  const meta=document.getElementById('ag-layout-meta');
+  if(sug!==cur)meta.innerHTML='<span style="color:var(--am);">⚠ Estás usando Layout '+cur+' aunque el sugerido es L'+sug+'</span>';
+  else meta.innerHTML='<span style="color:var(--gn);">✓ Layout sugerido</span>';
+  const subtitle=document.querySelector('#vw-agil .ps');
+  if(subtitle)subtitle.textContent='15 preguntas · Layout '+cur+' "'+layouts[cur]?.nombre+'" · '+(sug===cur?'corresponde a esta evaluación':'manual override');
+}
+
+async function cambiarLayout(id){
+  AS.layout=id;
+  renderLayoutBar();
+  await loadAgilForMonth();
+}
+
+async function loadAgilForMonth(){
+  const ejId=document.getElementById('ag-ej').value;
+  const mes=document.getElementById('ag-mes').value;
+  const config=getAgilConfig(AS.layout);
+  AS.c=config.map(()=>false);
   if(USE_SUPABASE&&SB){
     try{
       const {data}=await SB.from('evaluaciones_agiles').select('*').eq('ejecutivo_id',ejId).eq('mes',mes).maybeSingle();
-      if(data){AS.c=data.checks||config.map(()=>false);document.getElementById('ag-comentarios').value=data.comentarios||'';}
+      if(data&&data.layout_id===AS.layout){AS.c=data.checks||config.map(()=>false);document.getElementById('ag-comentarios').value=data.comentarios||'';}
       else{document.getElementById('ag-comentarios').value='';}
     }catch(e){
       const ex=(DB.evaluacionesAgiles||[]).find(e=>e.ejecutivo===ejId&&e.mes===mes);
-      if(ex){AS.c=ex.checks.slice();document.getElementById('ag-comentarios').value=ex.comentarios||'';}
+      if(ex&&(ex.layout||ex.layout_id)===AS.layout){AS.c=ex.checks.slice();document.getElementById('ag-comentarios').value=ex.comentarios||'';}
       else{document.getElementById('ag-comentarios').value='';}
     }
   }else{
     const ex=(DB.evaluacionesAgiles||[]).find(e=>e.ejecutivo===ejId&&e.mes===mes);
-    if(ex){AS.c=ex.checks.slice();document.getElementById('ag-comentarios').value=ex.comentarios||'';}
+    if(ex&&(ex.layout||ex.layout_id)===AS.layout){AS.c=ex.checks.slice();document.getElementById('ag-comentarios').value=ex.comentarios||'';}
     else{document.getElementById('ag-comentarios').value='';}
   }
   renderAgil();
 }
 
 function renderAgil(){
-  const config=getAgilConfig();
+  const config=getAgilConfig(AS.layout);
   let h='';
-  // Agrupar por criterio
   const porCrit={};
   config.forEach((p,i)=>{if(!porCrit[p.criterio_idx])porCrit[p.criterio_idx]=[];porCrit[p.criterio_idx].push({...p,idx:i});});
   Object.keys(porCrit).sort().forEach(ci=>{
     const crit=DB.criterios[ci];if(!crit)return;
     h+='<div style="padding:12px 0;border-bottom:1px solid var(--bd);"><div style="font-size:13px;font-weight:600;margin-bottom:8px;color:'+CC[ci]+';">'+crit.nombre+'</div>';
     porCrit[ci].forEach(p=>{
-      h+='<div class="er" onclick="tAg('+p.idx+')"><div class="eck'+(AS.c[p.idx]?' on':'')+'" id="ag-ck-'+p.idx+'"></div><span class="etxt">'+p.texto+'</span><span class="epts">'+p.pts+'p</span></div>';
+      h+='<div class="er" onclick="tAg('+p.idx+')" style="align-items:flex-start;">';
+      h+='<div class="eck'+(AS.c[p.idx]?' on':'')+'" id="ag-ck-'+p.idx+'" style="margin-top:2px;flex-shrink:0;"></div>';
+      h+='<div style="flex:1;">';
+      h+='<span class="etxt">'+p.texto+'</span>';
+      if(p.nota&&p.nota.trim())h+='<div style="font-size:10px;color:var(--am);margin-top:3px;font-style:italic;background:var(--am2);padding:3px 7px;border-radius:4px;display:inline-block;">💡 '+p.nota+'</div>';
+      h+='</div>';
+      h+='<span class="epts" style="flex-shrink:0;">'+p.pts+'p</span>';
+      h+='</div>';
     });
     h+='</div>';
   });
@@ -2523,7 +2661,7 @@ function renderAgil(){
 function tAg(i){AS.c[i]=!AS.c[i];const el=document.getElementById('ag-ck-'+i);if(el)el.classList.toggle('on',AS.c[i]);uAgilScore();}
 
 function uAgilScore(){
-  const config=getAgilConfig();
+  const config=getAgilConfig(AS.layout);
   let total=0,maxTotal=0;
   const porCrit={};
   config.forEach((p,i)=>{
@@ -2549,53 +2687,77 @@ function uAgilScore(){
   document.getElementById('ag-mb').innerHTML=mb;
 }
 
-function resetAgil(){const config=getAgilConfig();AS.c=config.map(()=>false);document.getElementById('ag-comentarios').value='';renderAgil();}
+function resetAgil(){const config=getAgilConfig(AS.layout);AS.c=config.map(()=>false);document.getElementById('ag-comentarios').value='';renderAgil();}
 
 async function guardarAgil(){
   const ejId=document.getElementById('ag-ej').value;const mes=document.getElementById('ag-mes').value;
   if(!ejId)return alert('Selecciona un ejecutivo');
-  const config=getAgilConfig();
+  const config=getAgilConfig(AS.layout);
   let total=0,maxTotal=0;
   config.forEach((p,i)=>{maxTotal+=p.pts;if(AS.c[i])total+=p.pts;});
   const score=maxTotal?Math.round(total/maxTotal*100):0;
   const comentarios=document.getElementById('ag-comentarios').value;
-  // Local
   if(!DB.evaluacionesAgiles)DB.evaluacionesAgiles=[];
   const idx=DB.evaluacionesAgiles.findIndex(e=>e.ejecutivo===ejId&&e.mes===mes);
-  const obj={id:idx>=0?DB.evaluacionesAgiles[idx].id:'ag'+Date.now(),ejecutivo:ejId,mes,score,checks:AS.c.slice(),comentarios,evaluador:SESSION?.usuario||'',fecha:new Date().toISOString()};
+  const obj={id:idx>=0?DB.evaluacionesAgiles[idx].id:'ag'+Date.now(),ejecutivo:ejId,mes,score,checks:AS.c.slice(),comentarios,evaluador:SESSION?.usuario||'',fecha:new Date().toISOString(),layout:AS.layout,layout_id:AS.layout};
   if(idx>=0)DB.evaluacionesAgiles[idx]=obj;else DB.evaluacionesAgiles.push(obj);
   save();
-  // Supabase
   if(USE_SUPABASE&&SB){
     try{
-      await SB.from('evaluaciones_agiles').upsert({ejecutivo_id:ejId,mes,score,checks:AS.c.slice(),comentarios,evaluador:SESSION?.usuario||'',fecha:new Date().toISOString()},{onConflict:'ejecutivo_id,mes'});
-      alert('Evaluación ágil guardada en la nube. Score: '+score+'/100');return;
+      await SB.from('evaluaciones_agiles').upsert({ejecutivo_id:ejId,mes,score,checks:AS.c.slice(),comentarios,evaluador:SESSION?.usuario||'',fecha:new Date().toISOString(),layout_id:AS.layout},{onConflict:'ejecutivo_id,mes'});
+      alert('Evaluación ágil guardada en la nube. Layout '+AS.layout+' · Score: '+score+'/100');return;
     }catch(e){console.error('Error sync ágil:',e);alert('Guardada localmente. Sync a la nube falló: '+e.message);return;}
   }
-  alert('Evaluación ágil guardada. Score: '+score+'/100');
+  alert('Evaluación ágil guardada. Layout '+AS.layout+' · Score: '+score+'/100');
 }
 
-// ── Render config Ágil en Administración ───────────────────
+// ── Render config Ágil en Administración (3 layouts) ───────
+let ADMIN_LAYOUT_SEL=1;
+function setAdminLayout(id){ADMIN_LAYOUT_SEL=id;renderAgilConfigAdmin();}
 function renderAgilConfigAdmin(){
-  const config=getAgilConfig();
-  let h='';
+  const layouts=getAgilLayouts();
+  const cur=ADMIN_LAYOUT_SEL;
+  const config=layouts[cur]?.preguntas||[];
   const totalPts=config.reduce((s,p)=>s+p.pts,0);
-  h+='<div style="padding:8px 16px;background:'+(totalPts===100?'var(--gn2)':'var(--am2)')+';color:'+(totalPts===100?'var(--gn)':'var(--am)')+';font-size:11px;font-weight:600;">Suma actual: '+totalPts+'/100 puntos '+(totalPts===100?'✓':'⚠ debe sumar 100')+'</div>';
+  let h='';
+  // Tabs
+  h+='<div style="display:flex;gap:4px;padding:10px 16px 0;border-bottom:1px solid var(--bd);">';
+  [1,2,3].forEach(id=>{
+    const l=layouts[id];if(!l)return;
+    const active=cur===id;
+    h+='<button class="subtab'+(active?' active':'')+'" onclick="setAdminLayout('+id+')">L'+id+' — '+l.nombre+'</button>';
+  });
+  h+='</div>';
+  // Layout meta editable
+  h+='<div style="padding:10px 16px;background:var(--bg);border-bottom:1px solid var(--bd);font-size:11px;color:var(--t2);">';
+  h+='<strong>Layout '+cur+' — '+layouts[cur].nombre+'</strong><br>'+layouts[cur].descripcion;
+  h+='</div>';
+  // Suma
+  h+='<div style="padding:8px 16px;background:'+(totalPts===100?'var(--gn2)':'var(--am2)')+';color:'+(totalPts===100?'var(--gn)':'var(--am)')+';font-size:11px;font-weight:600;">Suma Layout '+cur+': '+totalPts+'/100 puntos '+(totalPts===100?'✓':'⚠ debe sumar 100')+'</div>';
+  // Preguntas
   config.forEach((p,i)=>{
-    h+='<div style="padding:8px 16px;border-bottom:1px solid var(--bd);display:flex;gap:8px;align-items:center;">';
+    h+='<div style="padding:10px 16px;border-bottom:1px solid var(--bd);">';
+    h+='<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">';
     h+='<span style="font-size:10px;color:var(--t3);font-family:DM Mono;min-width:24px;">'+(i+1)+'</span>';
     h+='<select class="sel" style="min-width:140px;" onchange="setAgilCrit('+i+',this.value)">';
     DB.criterios.forEach((c,ci)=>{h+='<option value="'+ci+'"'+(ci==p.criterio_idx?' selected':'')+'>'+c.nombre+'</option>';});
     h+='</select>';
-    h+='<input class="ed" value="'+p.texto.replace(/"/g,'&quot;')+'" onblur="setAgilTexto('+i+',this.value)" style="flex:1;font-size:12px;">';
+    h+='<input class="ed" value="'+(p.texto||'').replace(/"/g,'&quot;')+'" onblur="setAgilTexto('+i+',this.value)" style="flex:1;font-size:12px;">';
     h+='<input type="number" value="'+p.pts+'" min="1" max="20" onblur="setAgilPts('+i+',this.value)" style="width:50px;text-align:center;border:1px solid var(--bd2);border-radius:4px;padding:3px;font-family:inherit;font-size:11px;background:var(--bg);">';
+    h+='</div>';
+    h+='<div style="display:flex;gap:8px;align-items:center;padding-left:32px;">';
+    h+='<span style="font-size:10px;color:var(--am);min-width:80px;">💡 Nota evaluador:</span>';
+    h+='<input class="ed" value="'+(p.nota||'').replace(/"/g,'&quot;')+'" onblur="setAgilNota('+i+',this.value)" placeholder="(opcional) Indicación para el evaluador" style="flex:1;font-size:11px;">';
+    h+='</div>';
     h+='</div>';
   });
   document.getElementById('adag').innerHTML=h;
 }
-function setAgilCrit(i,v){const c=getAgilConfig();c[i].criterio_idx=parseInt(v);saveAgilConfig(c);renderAgilConfigAdmin();}
-function setAgilTexto(i,v){const c=getAgilConfig();c[i].texto=v;saveAgilConfig(c);}
-function setAgilPts(i,v){const c=getAgilConfig();c[i].pts=parseInt(v)||1;saveAgilConfig(c);renderAgilConfigAdmin();}
+function setAgilCrit(i,v){const ls=getAgilLayouts();ls[ADMIN_LAYOUT_SEL].preguntas[i].criterio_idx=parseInt(v);saveAgilLayouts(ls);renderAgilConfigAdmin();}
+function setAgilTexto(i,v){const ls=getAgilLayouts();ls[ADMIN_LAYOUT_SEL].preguntas[i].texto=v;saveAgilLayouts(ls);}
+function setAgilPts(i,v){const ls=getAgilLayouts();ls[ADMIN_LAYOUT_SEL].preguntas[i].pts=parseInt(v)||1;saveAgilLayouts(ls);renderAgilConfigAdmin();}
+function setAgilNota(i,v){const ls=getAgilLayouts();ls[ADMIN_LAYOUT_SEL].preguntas[i].nota=v;saveAgilLayouts(ls);}
+function resetAgilConfig(){resetAgilLayouts();}
 
 // ── Visibilidad de pestañas ────────────────────────────────
 const TABS_DEF=[
