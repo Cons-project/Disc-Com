@@ -345,6 +345,14 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFAF8;}
       <input class="inp" style="width:100%;" placeholder="Observaciones opcionales..." id="enotas"></div>
   </div>
   <div id="ewrap" style="display:none;">
+    <div id="e-layout-bar" style="background:var(--surface);border:1px solid var(--bd);border-radius:var(--r);padding:14px 18px;margin-bottom:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+        <div style="font-size:12px;color:var(--t2);">Layout de la evaluación <span id="e-layout-suggest" style="font-size:11px;color:var(--am);margin-left:6px;"></span></div>
+        <div style="font-size:10px;color:var(--t3);" id="e-layout-meta"></div>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;" id="e-layout-btns"></div>
+      <div style="font-size:11px;color:var(--t2);margin-top:10px;background:var(--bg);padding:10px 12px;border-radius:6px;border-left:3px solid var(--acc);" id="e-layout-desc"></div>
+    </div>
     <div class="ss">
       <div><div class="sn" id="esn" style="color:var(--t3);">0</div><div style="font-size:12px;color:var(--t2);margin-top:2px;">puntos de 100</div>
         <div style="display:flex;align-items:center;gap:6px;margin-top:6px;" id="esem"><div style="width:8px;height:8px;border-radius:50%;background:var(--t3);"></div><span style="font-size:12px;color:var(--t3);">Sin evaluar</span></div>
@@ -1040,6 +1048,7 @@ function initApp(){
   roleEl.textContent=SESSION.rol==='super_admin'?'Super Admin':'Evaluador';
   roleEl.className='nu-role'+(SESSION.rol==='super_admin'?' sa':'');
   document.getElementById('nb-usuarios').style.display=SESSION.rol==='super_admin'?'':'none';
+  document.getElementById('nb-admin').style.display=SESSION.rol==='super_admin'?'':'none';
   showScr('app');
   const _mes=new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0');
   ['dm','emes','ofm'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=_mes;});
@@ -1171,6 +1180,7 @@ function initApp(){
   roleEl.textContent=SESSION.rol==='super_admin'?'Super Admin':'Evaluador';
   roleEl.className='nu-role'+(SESSION.rol==='super_admin'?' sa':'');
   document.getElementById('nb-usuarios').style.display=SESSION.rol==='super_admin'?'':'none';
+  document.getElementById('nb-admin').style.display=SESSION.rol==='super_admin'?'':'none';
   showScr('app');
   if(typeof applyTabsVis==='function')applyTabsVis();
   const _mes=new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0');
@@ -1191,7 +1201,7 @@ async function sbInit(){
     if(ejs&&ejs.length)DB.ejecutivos=ejs.map(e=>({id:e.id,nombre:e.nombre,oficina:e.oficina_id,fase:e.fase||''}));
     const {data:evs}=await SB.from('evaluaciones').select('id,ejecutivo_id,mes,score,scores_criterios,notas,guardada,detalle_checks,bancos_sel,evaluador');
     if(evs&&evs.length){
-      DB.evaluaciones=evs.map(ev=>({id:ev.id,ejecutivo:ev.ejecutivo_id,mes:ev.mes,score:ev.score,criterios:ev.scores_criterios,notas:ev.notas||'',guardada:ev.guardada,evaluador:ev.evaluador||'',detalle:ev.detalle_checks||null,bancos:ev.bancos_sel||null}));
+      DB.evaluaciones=evs.map(ev=>({id:ev.id,ejecutivo:ev.ejecutivo_id,mes:ev.mes,score:ev.score,criterios:ev.scores_criterios,notas:ev.notas||'',guardada:ev.guardada,evaluador:ev.evaluador||'',detalle:ev.detalle_checks||null,bancos:ev.bancos_sel||null,layout:ev.layout_id||null,layout_id:ev.layout_id||null}));
     }else DB.evaluaciones=[];
     // MVP3: Load Ágil evaluations
     try{
@@ -1211,7 +1221,7 @@ async function sbSaveEval(obj){
     const {data,error}=await SB.from('evaluaciones').upsert({
       ejecutivo_id:obj.ejecutivo,mes:obj.mes,score:obj.score,scores_criterios:obj.criterios,
       notas:obj.notas,guardada:obj.guardada,evaluador:obj.evaluador||SESSION?.usuario||'',
-      detalle_checks:obj.detalle,bancos_sel:obj.bancos
+      detalle_checks:obj.detalle,bancos_sel:obj.bancos,layout_id:obj.layout||obj.layout_id||1
     },{onConflict:'ejecutivo_id,mes'}).select('id').single();
     if(error)throw error;
     const idx=DB.evaluaciones.findIndex(e=>e.ejecutivo===obj.ejecutivo&&e.mes===obj.mes);
@@ -1309,82 +1319,133 @@ function rD(){
   document.getElementById('etb').innerHTML=h||'<tr><td colspan="5" class="empty">Sin resultados</td></tr>';
 }
 
-let ES={c:[],b:[]};
+let ES={c:[],layout:1,layoutSugerido:1};
 function lES(){
   const sel=document.getElementById('eej');
   sel.innerHTML='<option value="">Selecciona</option>';
   DB.ejecutivos.forEach(e=>{sel.innerHTML+='<option value="'+e.id+'">'+e.nombre+' - '+gOf(e.oficina).nombre+'</option>';});
 }
 function gE(ejId,mes){sv('evaluar');document.getElementById('eej').value=ejId;if(mes)document.getElementById('emes').value=mes;lE();}
-function lE(){
+
+async function lE(){
   const ejId=document.getElementById('eej').value;
   const mes=document.getElementById('emes').value;
   if(!ejId){document.getElementById('ewrap').style.display='none';document.getElementById('eempty').style.display='block';return;}
   document.getElementById('eempty').style.display='none';
   document.getElementById('ewrap').style.display='block';
-  ES.c=DB.criterios.map(c=>c.evidencias.map(()=>false));
-  ES.b=DB.criterios.map(c=>c.evidencias.map(e=>e.tipo==='rotativa'?0:-1));
+
+  // Determinar layout sugerido por # evaluaciones previas
+  const all=DB.evaluaciones.filter(e=>e.ejecutivo===ejId&&e.guardada);
+  const prevCount=all.filter(d=>d.mes<mes).length;
+  const sugerido=(prevCount%3)+1;
+  ES.layoutSugerido=sugerido;
+
+  // Cargar evaluación existente si la hay
   const ex=gEv(ejId,mes);
-  if(ex&&ex.detalle){
-    ex.detalle.forEach((row,ci)=>{if(Array.isArray(row))row.forEach((v,ei)=>{if(ES.c[ci]&&ei<ES.c[ci].length)ES.c[ci][ei]=!!v;});});
-    if(ex.bancos)ex.bancos.forEach((row,ci)=>{if(Array.isArray(row))row.forEach((v,ei)=>{if(ES.b[ci]&&ei<ES.b[ci].length&&typeof v==='number')ES.b[ci][ei]=v;});});
+  if(ex&&ex.layout){ES.layout=ex.layout;}
+  else if(ex&&ex.layout_id){ES.layout=ex.layout_id;}
+  else{ES.layout=sugerido;}
+
+  const config=getEvalConfig(ES.layout);
+  ES.c=config.map(()=>false);
+
+  if(ex&&ex.detalle&&Array.isArray(ex.detalle)){
+    // Si detalle es array plano (nuevo formato layout)
+    if(typeof ex.detalle[0]==='boolean'||ex.detalle[0]===0||ex.detalle[0]===1){
+      ex.detalle.forEach((v,i)=>{if(i<ES.c.length)ES.c[i]=!!v;});
+    }
     document.getElementById('enotas').value=ex.notas||'';
   }else{document.getElementById('enotas').value='';}
+
   const prev=gPrev(ejId,mes);
   document.getElementById('eprev').innerHTML=prev?'Previo: <b>'+mL(prev.mes)+'</b> '+sBd(prev.score):'Sin evaluaciones previas';
+
+  renderEvalLayoutBar();
   rESc();
 }
+
+function renderEvalLayoutBar(){
+  const layouts=getEvalLayouts();
+  const cur=ES.layout;
+  const sug=ES.layoutSugerido;
+  let h='';
+  [1,2,3].forEach(id=>{
+    const l=layouts[id];if(!l)return;
+    const active=cur===id;
+    h+='<button class="btn-tool" onclick="cambiarEvalLayout('+id+')" style="'+(active?'background:var(--acc);color:#fff;border-color:var(--acc);':'')+'">';
+    h+='L'+id+' — '+l.nombre;
+    if(sug===id&&!active)h+=' <span style="font-size:9px;background:var(--am2);color:var(--am);padding:1px 5px;border-radius:8px;margin-left:4px;">sugerido</span>';
+    h+='</button>';
+  });
+  document.getElementById('e-layout-btns').innerHTML=h;
+  document.getElementById('e-layout-desc').innerHTML='<strong>🎯 Objetivo: </strong>'+(layouts[cur]?.objetivo||'');
+  const meta=document.getElementById('e-layout-meta');
+  if(sug!==cur)meta.innerHTML='<span style="color:var(--am);">⚠ Layout '+cur+' (sugerido era L'+sug+')</span>';
+  else meta.innerHTML='<span style="color:var(--gn);">✓ Layout sugerido para esta evaluación</span>';
+}
+
+function cambiarEvalLayout(id){
+  if(ES.c.some(v=>v)&&!confirm('Cambiar de layout reiniciará las marcas. ¿Continuar?'))return;
+  ES.layout=id;
+  const config=getEvalConfig(id);
+  ES.c=config.map(()=>false);
+  renderEvalLayoutBar();rESc();
+}
+
 function rESc(){
+  const config=getEvalConfig(ES.layout);
+  // Agrupar por criterio
+  const porCrit={};
+  config.forEach((p,i)=>{if(!porCrit[p.criterio_idx])porCrit[p.criterio_idx]=[];porCrit[p.criterio_idx].push({...p,idx:i});});
   let h='';
   DB.criterios.forEach((c,ci)=>{
+    const qs=porCrit[ci]||[];
+    if(!qs.length)return;
     let eh='';
-    c.evidencias.forEach((e,ei)=>{
-      const tag=e.tipo==='fija'?'<span class="etag fija">Fija</span>':'<span class="etag rot">Rotativa</span>';
-      let bh='';
-      if(e.tipo==='rotativa'&&e.banco.length){
-        const s0=ES.b[ci][ei]||0;
-        bh='<div class="bw"><div class="bh"><span>Pregunta del mes</span><button class="brd" onclick="rB('+ci+','+ei+')">Aleatoria</button></div>'+
-          e.banco.map((b,bi)=>'<div class="bo'+(bi===s0?' sel':'')+'" id="bo-'+ci+'-'+ei+'-'+bi+'" onclick="sB('+ci+','+ei+','+bi+')">'+ mkR(bi===s0,'br-'+ci+'-'+ei+'-'+bi) +'<span>'+b+'</span></div>').join('')+'</div>';
-      }
-      eh+='<div class="er" onclick="tC('+ci+','+ei+')"><div class="eck'+(ES.c[ci][ei]?' on':'')+'" id="eck-'+ci+'-'+ei+'"></div><span class="etxt">'+e.texto+'</span>'+tag+'<span class="epts">'+e.pts+'p</span></div>'+bh;
+    qs.forEach(p=>{
+      eh+='<div class="er" onclick="tC('+p.idx+')" style="align-items:flex-start;">';
+      eh+='<div class="eck'+(ES.c[p.idx]?' on':'')+'" id="eck-'+p.idx+'" style="margin-top:2px;flex-shrink:0;"></div>';
+      eh+='<div style="flex:1;">';
+      eh+='<span class="etxt">'+p.texto+'</span>';
+      if(p.nota&&p.nota.trim())eh+='<div style="font-size:10px;color:var(--am);margin-top:3px;font-style:italic;background:var(--am2);padding:3px 7px;border-radius:4px;display:inline-block;">💡 '+p.nota+'</div>';
+      eh+='</div>';
+      eh+='<span class="epts" style="flex-shrink:0;">'+p.pts+'p</span>';
+      eh+='</div>';
     });
-    h+='<div class="cb"><div class="ch" onclick="tCr('+ci+')"><span class="cpts">'+c.peso+'p</span><span class="cn">'+c.nombre+'</span><span class="csco" id="cs-'+ci+'" style="color:var(--t3)">0%</span><span class="ccv" id="cv-'+ci+'">+</span></div><div class="cbody" id="cbd-'+ci+'">'+eh+'<div class="pb"><div class="pf" id="pf-'+ci+'" style="width:0%;background:'+CC[ci]+'"></div></div></div></div>';
+    const peso=qs.reduce((s,q)=>s+q.pts,0);
+    h+='<div class="cb"><div class="ch" onclick="tCr('+ci+')"><span class="cpts">'+peso+'p</span><span class="cn">'+c.nombre+'</span><span class="csco" id="cs-'+ci+'" style="color:var(--t3)">0%</span><span class="ccv" id="cv-'+ci+'">+</span></div><div class="cbody open" id="cbd-'+ci+'">'+eh+'<div class="pb"><div class="pf" id="pf-'+ci+'" style="width:0%;background:'+CC[ci]+'"></div></div></div></div>';
   });
   document.getElementById('ecrits').innerHTML=h;
   uS();
 }
+
 function tCr(ci){document.getElementById('cbd-'+ci).classList.toggle('open');const cv=document.getElementById('cv-'+ci);cv.textContent=document.getElementById('cbd-'+ci).classList.contains('open')?'-':'+';}
-function tC(ci,ei){ES.c[ci][ei]=!ES.c[ci][ei];const el=document.getElementById('eck-'+ci+'-'+ei);if(el)el.classList.toggle('on',ES.c[ci][ei]);uS();autoSave();}
+function tC(idx){ES.c[idx]=!ES.c[idx];const el=document.getElementById('eck-'+idx);if(el)el.classList.toggle('on',ES.c[idx]);uS();autoSave();}
+
 function autoSave(){
   const ejId=document.getElementById('eej').value;
   const mes=document.getElementById('emes').value;
   if(!ejId)return;
   const idx=DB.evaluaciones.findIndex(e=>e.ejecutivo===ejId&&e.mes===mes);
-  const obj={id:idx>=0?DB.evaluaciones[idx].id:'ev'+Date.now(),ejecutivo:ejId,mes,score:null,criterios:null,notas:document.getElementById('enotas').value,guardada:false,evaluador:SESSION?.usuario||'',detalle:ES.c.map(r=>[...r]),bancos:ES.b.map(r=>[...r])};
+  const obj={id:idx>=0?DB.evaluaciones[idx].id:'ev'+Date.now(),ejecutivo:ejId,mes,score:null,criterios:null,notas:document.getElementById('enotas').value,guardada:false,evaluador:SESSION?.usuario||'',detalle:ES.c.slice(),bancos:null,layout:ES.layout,layout_id:ES.layout};
   if(idx>=0)DB.evaluaciones[idx]=obj;else DB.evaluaciones.push(obj);
   save();
   if(USE_SUPABASE)sbSaveEval(obj);
 }
-function mkR(sel,id){
-  const c=sel?'#4A2A8A':'#ccc';
-  return'<svg id="'+id+'" width="14" height="14" viewBox="0 0 14 14" style="flex-shrink:0;margin-top:2px;" xmlns="http://www.w3.org/2000/svg"><circle cx="7" cy="7" r="6" fill="none" stroke="'+c+'" stroke-width="1.5"/>'+(sel?'<circle cx="7" cy="7" r="3.5" fill="#4A2A8A"/>':'')+'</svg>';
-}
-function sB(ci,ei,bi){
-  ES.b[ci][ei]=bi;
-  DB.criterios[ci].evidencias[ei].banco.forEach((_,idx)=>{
-    const _r=document.getElementById('br-'+ci+'-'+ei+'-'+idx);
-    const o=document.getElementById('bo-'+ci+'-'+ei+'-'+idx);
-    if(_r)_r.outerHTML=mkR(idx===bi,'br-'+ci+'-'+ei+'-'+idx);
-    if(o)o.classList.toggle('sel',idx===bi);
-  });
-}
-function rB(ci,ei){const e=DB.criterios[ci].evidencias[ei];sB(ci,ei,Math.floor(Math.random()*e.banco.length));}
+
 function uS(){
+  const config=getEvalConfig(ES.layout);
+  const porCrit={};
+  config.forEach((p,i)=>{
+    if(!porCrit[p.criterio_idx])porCrit[p.criterio_idx]={got:0,max:0};
+    porCrit[p.criterio_idx].max+=p.pts;
+    if(ES.c[i])porCrit[p.criterio_idx].got+=p.pts;
+  });
   let tot=0;const pts=[];
   DB.criterios.forEach((c,ci)=>{
-    const tp=c.evidencias.reduce((s,e)=>s+e.pts,0);
-    const mp=ES.c[ci].reduce((s,v,ei)=>s+(v?c.evidencias[ei].pts:0),0);
-    const pct=Math.round((mp/tp)*100);pts.push(pct);tot+=(mp/tp)*c.peso;
+    const pc=porCrit[ci]||{got:0,max:0};
+    const pct=pc.max?Math.round((pc.got/pc.max)*100):0;
+    pts.push(pct);tot+=pc.got;
     const cs=document.getElementById('cs-'+ci);const pf=document.getElementById('pf-'+ci);
     if(cs){cs.textContent=pct+'%';cs.style.color=pct>0?sc(pct):'var(--t3)';}
     if(pf)pf.style.width=pct+'%';
@@ -1396,29 +1457,31 @@ function uS(){
   let mb='';DB.criterios.forEach((c,ci)=>{mb+='<div class="mr"><span class="ml">'+c.nombre+'</span><div class="mt"><div class="mf" style="width:'+pts[ci]+'%;background:'+CC[ci]+'"></div></div><span class="mp">'+pts[ci]+'%</span></div>';});
   document.getElementById('emb').innerHTML=mb;
 }
-function resetE(){ES.c=DB.criterios.map(c=>c.evidencias.map(()=>false));rESc();}
+
+function resetE(){const config=getEvalConfig(ES.layout);ES.c=config.map(()=>false);rESc();}
+
 function guardar(){
   const ejId=document.getElementById('eej').value;
   const mes=document.getElementById('emes').value;
   const notas=document.getElementById('enotas').value;
   if(!ejId)return alert('Selecciona un ejecutivo');
-  let tot=0;const cS=[];
-  DB.criterios.forEach((c,ci)=>{
-    const tp=c.evidencias.reduce((s,e)=>s+e.pts,0);
-    const mp=ES.c[ci].reduce((s,v,ei)=>s+(v?c.evidencias[ei].pts:0),0);
-    cS.push(Math.round((mp/tp)*100));tot+=(mp/tp)*c.peso;
+  const config=getEvalConfig(ES.layout);
+  const porCrit={};
+  config.forEach((p,i)=>{
+    if(!porCrit[p.criterio_idx])porCrit[p.criterio_idx]={got:0,max:0};
+    porCrit[p.criterio_idx].max+=p.pts;
+    if(ES.c[i])porCrit[p.criterio_idx].got+=p.pts;
   });
-  const score=Math.round(tot);
+  let tot=0;const cS=[];
+  DB.criterios.forEach((c,ci)=>{const pc=porCrit[ci]||{got:0,max:0};const pct=pc.max?Math.round((pc.got/pc.max)*100):0;cS.push(pct);tot+=pc.got;});
+  const s=Math.round(tot);
   const idx=DB.evaluaciones.findIndex(e=>e.ejecutivo===ejId&&e.mes===mes);
-  const obj={id:idx>=0?DB.evaluaciones[idx].id:'ev'+Date.now(),ejecutivo:ejId,mes,score,criterios:cS,notas,guardada:true,evaluador:SESSION?.usuario||'',detalle:ES.c.map(r=>[...r]),bancos:ES.b.map(r=>[...r])};
+  const obj={id:idx>=0?DB.evaluaciones[idx].id:'ev'+Date.now(),ejecutivo:ejId,mes,score:s,criterios:cS,notas,guardada:true,evaluador:SESSION?.usuario||'',detalle:ES.c.slice(),bancos:null,layout:ES.layout,layout_id:ES.layout};
   if(idx>=0)DB.evaluaciones[idx]=obj;else DB.evaluaciones.push(obj);
   save();
   if(USE_SUPABASE)sbSaveEval(obj);
-  const bajas=DB.criterios.filter((_,ci)=>cS[ci]<50).map(c=>c.nombre);
-  const ej=gEj(ejId);
-  document.getElementById('mss').textContent=ej.nombre+' - '+mL(mes);
-  document.getElementById('msb').innerHTML='<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;"><div style="font-size:36px;font-weight:600;color:'+sc(score)+'">'+score+'</div><div><div style="font-size:13px;font-weight:500;">'+(score>=80?'Disciplina sólida':score>=60?'En desarrollo':'Requiere atención')+'</div><div style="font-size:12px;color:var(--t2);">puntos de 100</div></div></div>'+(bajas.length?'<div style="font-size:12px;color:var(--t2);margin-bottom:8px;font-weight:500;">Criterios bajo 50%:</div>'+bajas.map(b=>'<div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid var(--bd);font-size:13px;"><span style="color:var(--rd);">▸</span>'+b+'</div>').join(''):'<div style="font-size:13px;color:var(--gn);">Todos los criterios superan el 50%.</div>');
-  document.getElementById('msaved').classList.add('open');
+  alert('Evaluación guardada. Layout '+ES.layout+' · Score: '+s+'/100');
+  rD();
 }
 
 function rEvo(){
@@ -2447,7 +2510,95 @@ function exportPDF(modo,id){
 // MVP2 — EVALUACIÓN ÁGIL
 // ══════════════════════════════════════════════════════════
 
-// 3 LAYOUTS: 1=Fundamentos, 2=Aplicación, 3=Impacto
+// 3 LAYOUTS PARA EVALUACIÓN NORMAL (15 min · 18 preguntas c/u · sum=100)
+const EVAL_LAYOUTS_DEFAULT={
+  1:{
+    nombre:'Fundamentos',
+    objetivo:'Mide si el ejecutivo tiene los procesos en su lugar y conoce los conceptos básicos. Foco: disciplina como hábito instalado. Sugerido para 1ra evaluación o nuevos ingresos.',
+    preguntas:[
+      {texto:'Sabe su % de cumplimiento al presupuesto del mes (en $ y %) y desglosado por tipo de negocio',criterio_idx:0,pts:5,nota:'Pedir que muestre el dashboard donde lo consulta'},
+      {texto:'Conoce qué productos tienen mayor caída en utilidad y el ramo más afectado',criterio_idx:0,pts:5,nota:''},
+      {texto:'Identifica los agentes con mayor decremento vs año anterior',criterio_idx:0,pts:5,nota:'Validar que pueda nombrarlos sin consultar el reporte'},
+      {texto:'Tomó acción concreta basada en un dato del tablero esta semana, ¿cuál? Documentar',criterio_idx:0,pts:5,nota:'La acción debe ser específica, no genérica'},
+      {texto:'Sabe el número exacto de agentes activos hoy',criterio_idx:1,pts:7,nota:''},
+      {texto:'Sabe qué agentes no le han emitido en el mes/año',criterio_idx:1,pts:7,nota:''},
+      {texto:'Ejecutó acción de reactivación en los últimos 15 días, está documentada',criterio_idx:1,pts:6,nota:'Pedir evidencia documental (correo, mensaje, registro)'},
+      {texto:'Tiene negocios solo vigentes en las tuberías',criterio_idx:2,pts:5,nota:'Revisar que no haya negocios vencidos sin actualizar'},
+      {texto:'Ha enviado al BOT folios para cerrar este mes',criterio_idx:2,pts:4,nota:''},
+      {texto:'Reunión con gerente esta semana ya ocurrió o está agendada, mostrar evidencia',criterio_idx:3,pts:6,nota:''},
+      {texto:'Planes de acción de la reunión están actualizados con su estatus',criterio_idx:3,pts:5,nota:'Pedir mostrar el documento o herramienta donde los registra'},
+      {texto:'Proyección documentada con negocios específicos a cerrar, en los campos correctos del reporte',criterio_idx:4,pts:7,nota:'Validar que los negocios estén correctamente capturados'},
+      {texto:'Planes de acción específicos si la proyección es menor al 100%, documentados',criterio_idx:4,pts:7,nota:''},
+      {texto:'La proyección incluye negocios de diferentes agentes o ramos',criterio_idx:4,pts:6,nota:''},
+      {texto:'Plan de visitas documentado de la semana actual, pedir evidencia',criterio_idx:5,pts:5,nota:''},
+      {texto:'Cada visita planeada tiene objetivo definido, pedir evidencia',criterio_idx:5,pts:5,nota:''},
+      {texto:'Liga visitas con data de algún dashboard, lo sabe explicar',criterio_idx:5,pts:5,nota:'Que explique la conexión, no solo lo afirme'},
+      {texto:'Las visitas están priorizadas por importancia comercial, no por proximidad geográfica',criterio_idx:5,pts:5,nota:''}
+    ]
+  },
+  2:{
+    nombre:'Aplicación',
+    objetivo:'Mide si el ejecutivo está USANDO la información para tomar decisiones y modificar su práctica. Foco: disciplina como práctica activa. Sugerido para 2da evaluación.',
+    preguntas:[
+      {texto:'Identifica los productos con mayor caída en utilidad y propone una acción concreta para revertirla',criterio_idx:0,pts:5,nota:'Validar que la respuesta incluya acción, no solo el dato'},
+      {texto:'Modificó su estrategia o agenda esta semana basado en algún dato del tablero, ¿cuál y cómo?',criterio_idx:0,pts:5,nota:'El cambio debe ser concreto y trazable'},
+      {texto:'Conoce los 3 agentes con mejor cumplimiento del mes y qué los hace destacar',criterio_idx:0,pts:5,nota:''},
+      {texto:'Toma decisiones de priorización basadas en cumplimiento de cuota, no en relación personal',criterio_idx:0,pts:5,nota:''},
+      {texto:'Sabe cuántos agentes están en no-emisión por más de 60 días y tiene plan específico para cada uno',criterio_idx:1,pts:7,nota:'Pedir que mencione al menos 3 casos con plan'},
+      {texto:'Tiene segmentado a sus agentes por nivel de producción y prioriza acompañamiento diferenciado',criterio_idx:1,pts:7,nota:'Validar segmentación documentada'},
+      {texto:'Resultado medible de alguna reactivación reciente: el agente ya emitió o tiene cita programada',criterio_idx:1,pts:6,nota:''},
+      {texto:'Las tuberías están actualizadas con fecha de seguimiento próxima, sin negocios estancados',criterio_idx:2,pts:5,nota:'Revisar negocios sin actualización mayor a 15 días'},
+      {texto:'Filtra y analiza tuberías por etapa, no solo las consulta de forma general',criterio_idx:2,pts:4,nota:'Pedir que demuestre el filtro frente al evaluador'},
+      {texto:'Llega a la reunión con gerente con agenda propia y propuestas, no solo a reportar',criterio_idx:3,pts:6,nota:'Validar formato de la última reunión'},
+      {texto:'Cierra cada reunión con compromisos específicos y los cumple antes de la siguiente',criterio_idx:3,pts:5,nota:'Cruzar compromisos anteriores vs cumplimiento real'},
+      {texto:'La proyección del mes anterior se cumplió (≥90%) y sabe explicar las desviaciones puntuales',criterio_idx:4,pts:7,nota:'Pedir comparativo proyectado vs real'},
+      {texto:'Su proyección actual incluye negocios diversificados (no concentrados en 1-2 agentes o ramos)',criterio_idx:4,pts:7,nota:'Validar distribución de la cartera proyectada'},
+      {texto:'Tiene plan de contingencia documentado si negocios clave no se cierran',criterio_idx:4,pts:6,nota:''},
+      {texto:'Las visitas de la semana pasada generaron acciones de seguimiento documentadas',criterio_idx:5,pts:5,nota:''},
+      {texto:'Prioriza visitas en función del impacto potencial al presupuesto, no por proximidad o costumbre',criterio_idx:5,pts:5,nota:'Pedir criterio de priorización'},
+      {texto:'Ajusta el plan de visitas semanalmente con base en hallazgos del mes',criterio_idx:5,pts:5,nota:''},
+      {texto:'Las visitas se preparan con análisis previo de la situación del agente o cliente',criterio_idx:5,pts:5,nota:''}
+    ]
+  },
+  3:{
+    nombre:'Impacto',
+    objetivo:'Mide si la disciplina está GENERANDO RESULTADOS medibles y si el ejecutivo anticipa problemas. Foco: disciplina como motor de resultados. Sugerido para 3ra evaluación en adelante.',
+    preguntas:[
+      {texto:'Sus decisiones del trimestre se reflejan en mejora medible del cumplimiento o del mix de cartera',criterio_idx:0,pts:5,nota:'Pedir indicador antes/después con métrica clara'},
+      {texto:'Anticipa tendencias del mes con base en datos parciales (proyección a día 10 vs cierre real)',criterio_idx:0,pts:5,nota:'Validar precisión de proyecciones previas'},
+      {texto:'Ha generado al menos un análisis propio (no estándar del tablero) que llevó a una decisión comercial',criterio_idx:0,pts:5,nota:''},
+      {texto:'Identifica oportunidades de cross-sell o up-sell basadas en análisis de cartera',criterio_idx:0,pts:5,nota:''},
+      {texto:'Tiene casos concretos de agentes reactivados que ya emiten de forma consistente',criterio_idx:1,pts:7,nota:'Pedir mínimo 2 ejemplos con métrica antes/después'},
+      {texto:'Identifica patrones de riesgo de deserción en agentes antes que los muestre el reporte',criterio_idx:1,pts:7,nota:'Validar con un caso reciente proactivo'},
+      {texto:'Sus acciones de reactivación tienen tasa de éxito medible mayor al 30%',criterio_idx:1,pts:6,nota:'Pedir cálculo: reactivados / intentos'},
+      {texto:'La conversión de su tubería ha mejorado mes a mes en los últimos 3 meses',criterio_idx:2,pts:5,nota:'Pedir comparativo mensual'},
+      {texto:'Identifica cuellos de botella recurrentes en sus tuberías y los aborda sistémicamente',criterio_idx:2,pts:4,nota:''},
+      {texto:'Las decisiones tomadas en reuniones generan resultados visibles en el siguiente reporte',criterio_idx:3,pts:6,nota:''},
+      {texto:'Lleva un seguimiento longitudinal de compromisos: tasa de cumplimiento mayor al 80%',criterio_idx:3,pts:5,nota:'Pedir tracker'},
+      {texto:'Sus proyecciones de los últimos 3 meses se cumplieron con desviación menor al 10%',criterio_idx:4,pts:7,nota:'Validar histórico'},
+      {texto:'Anticipa riesgos a la proyección con más de 10 días de antelación y los comunica formalmente',criterio_idx:4,pts:7,nota:'Pedir ejemplo reciente con fecha'},
+      {texto:'Identifica negocios "fantasma" en la proyección (probabilidad real baja) y los gestiona o retira',criterio_idx:4,pts:6,nota:''},
+      {texto:'Sus visitas se conectan con cierres específicos: puede trazar visita → negocio cerrado',criterio_idx:5,pts:5,nota:'Pedir mínimo 2 casos del último trimestre'},
+      {texto:'Las visitas ajustan estrategia del agente: hay cambios documentados en comportamiento post-visita',criterio_idx:5,pts:5,nota:''},
+      {texto:'Su plan de visitas incorpora aprendizajes de visitas pasadas, no es plantilla repetida',criterio_idx:5,pts:5,nota:''},
+      {texto:'Las visitas generan compromisos del agente que son trackeados y validados en la siguiente visita',criterio_idx:5,pts:5,nota:''}
+    ]
+  }
+};
+
+function getEvalLayouts(){
+  const saved=JSON.parse(localStorage.getItem('dc_eval_layouts')||'null');
+  if(saved&&saved[1]&&saved[2]&&saved[3])return saved;
+  return JSON.parse(JSON.stringify(EVAL_LAYOUTS_DEFAULT));
+}
+function saveEvalLayouts(layouts){localStorage.setItem('dc_eval_layouts',JSON.stringify(layouts));}
+function getEvalConfig(layoutId){
+  const ls=getEvalLayouts();
+  const id=layoutId||1;
+  return ls[id]?ls[id].preguntas:EVAL_LAYOUTS_DEFAULT[1].preguntas.slice();
+}
+
+// 3 LAYOUTS PARA EVALUACIÓN ÁGIL (5-7 min · 15 preguntas)
 const AGIL_LAYOUTS_DEFAULT={
   1:{
     nombre:'Fundamentos',
