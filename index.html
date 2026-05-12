@@ -347,7 +347,7 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFAF8;}
   <div id="ewrap" style="display:none;">
     <div id="e-layout-bar" style="background:var(--surface);border:1px solid var(--bd);border-radius:var(--r);padding:14px 18px;margin-bottom:16px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
-        <div style="font-size:12px;color:var(--t2);">Layout de la evaluación <span id="e-layout-suggest" style="font-size:11px;color:var(--am);margin-left:6px;"></span></div>
+        <div style="font-size:12px;color:var(--t2);">Opción de evaluación <span id="e-layout-suggest" style="font-size:11px;color:var(--am);margin-left:6px;"></span></div>
         <div style="font-size:10px;color:var(--t3);" id="e-layout-meta"></div>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;" id="e-layout-btns"></div>
@@ -611,12 +611,12 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFAF8;}
       <button class="btn btn-p btn-sm" onclick="previewBulkEj()" style="margin-top:8px;">Vista previa y agregar</button>
     </div>
   </div>
-  <div class="as" id="adcr-wrap"><div class="ash"><span class="ast">⚙ Configurar Evaluación Normal — 3 Layouts</span><button class="btn btn-sm" onclick="resetEvalLayouts()">Restaurar 3 layouts por defecto</button></div><div id="adcr"></div></div>
+  <div class="as" id="adcr-wrap"><div class="ash"><span class="ast">⚙ Configurar Evaluación Normal — 2 Opciones</span><span id="layouts-dirty-eval" style="display:none;font-size:10px;color:var(--am);background:var(--am2);padding:3px 8px;border-radius:8px;margin-left:8px;">● Cambios sin publicar</span><div style="margin-left:auto;display:flex;gap:6px;"><button class="btn btn-sm" onclick="discardEvalLayouts()">↺ Descartar</button><button class="btn btn-sm" onclick="publishEvalLayouts()" style="background:var(--gn);color:#fff;">💾 Publicar a todos</button><button class="btn btn-sm" onclick="resetEvalLayouts()">Restaurar default</button></div></div><div id="adcr"></div></div>
   <div class="as" id="adtv-wrap"><div class="ash"><span class="ast">👁 Visibilidad de pestañas</span></div>
     <div style="padding:10px 16px 14px;font-size:11px;color:var(--t2);">Activa/desactiva qué pestañas son visibles para todos los usuarios. Los cambios se aplican al refrescar la página.</div>
     <div id="adtv"></div>
   </div>
-  <div class="as" id="adag-wrap"><div class="ash"><span class="ast">⚡ Configurar Evaluación Ágil — 3 Layouts</span><button class="btn btn-sm" onclick="resetAgilConfig()">Restaurar 3 layouts por defecto</button></div>
+  <div class="as" id="adag-wrap"><div class="ash"><span class="ast">⚡ Configurar Evaluación Ágil — 3 Layouts</span><span id="layouts-dirty-agil" style="display:none;font-size:10px;color:var(--am);background:var(--am2);padding:3px 8px;border-radius:8px;margin-left:8px;">● Cambios sin publicar</span><div style="margin-left:auto;display:flex;gap:6px;"><button class="btn btn-sm" onclick="discardAgilLayouts()">↺ Descartar</button><button class="btn btn-sm" onclick="publishAgilLayouts()" style="background:var(--gn);color:#fff;">💾 Publicar a todos</button><button class="btn btn-sm" onclick="resetAgilConfig()">Restaurar default</button></div></div>
     <div style="padding:10px 16px 14px;font-size:11px;color:var(--t2);">3 layouts de 15 preguntas (suma 100 c/u). Se asignan automáticamente según evaluación #1, #2, #3+ y luego ciclan. Personaliza preguntas, puntos y notas para el evaluador.</div>
     <div id="adag"></div>
   </div>
@@ -1209,6 +1209,26 @@ async function sbInit(){
       if(ags&&ags.length){DB.evaluacionesAgiles=ags.map(a=>({id:a.id,ejecutivo:a.ejecutivo_id,mes:a.mes,score:a.score,checks:a.checks||[],comentarios:a.comentarios||'',evaluador:a.evaluador||'',fecha:a.fecha,layout:a.layout_id||1,layout_id:a.layout_id||1}));}
       else DB.evaluacionesAgiles=[];
     }catch(e){console.log('Tabla evaluaciones_agiles no disponible aún. Ejecuta el SQL de migración.');DB.evaluacionesAgiles=DB.evaluacionesAgiles||[];}
+    // Cargar layouts y config publicados desde app_config
+    try{
+      const {data:cfgs}=await SB.from('app_config').select('*').in('key',['eval_layouts','agil_layouts','tabs_vis']);
+      if(cfgs&&cfgs.length){
+        cfgs.forEach(c=>{
+          if(c.key==='eval_layouts'&&c.value){
+            localStorage.setItem('dc_eval_layouts',JSON.stringify(c.value));
+            localStorage.setItem('dc_eval_layouts_published',JSON.stringify(c.value));
+          }
+          if(c.key==='agil_layouts'&&c.value){
+            localStorage.setItem('dc_agil_layouts',JSON.stringify(c.value));
+            localStorage.setItem('dc_agil_layouts_published',JSON.stringify(c.value));
+          }
+          if(c.key==='tabs_vis'&&c.value){
+            localStorage.setItem('dc_tabs_vis',JSON.stringify(c.value));
+            if(typeof applyTabsVis==='function')applyTabsVis();
+          }
+        });
+      }
+    }catch(e){console.log('Tabla app_config no disponible aún. Ejecuta migracion_mvp7_config.sql.');}
     save();rD();lES();
     await acLoadFromSB();
     console.log('Supabase OK');
@@ -1252,6 +1272,11 @@ function sBd(s){
 }
 
 function sv(id){
+  // Guards: admin-only sections
+  if((id==='admin'||id==='usuarios')&&SESSION?.rol!=='super_admin'){
+    alert('Acceso restringido. Solo administradores pueden ver esta sección.');
+    id='dashboard';
+  }
   document.querySelectorAll('.vw').forEach(v=>v.classList.remove('active'));
   document.querySelectorAll('.ntb').forEach(t=>t.classList.remove('active'));
   document.getElementById('vw-'+id).classList.add('active');
@@ -1259,7 +1284,7 @@ function sv(id){
   if(id==='dashboard')rD();
   if(id==='evolución'||id==='evolucion')rEvo();
   if(id==='oficinas')rOf();
-  if(id==='admin'){rAdmin();if(SESSION?.rol==='super_admin'&&typeof renderTabsVisAdmin==='function'){renderTabsVisAdmin();const w=document.getElementById('adtv-wrap');if(w)w.style.display='';}else{const w=document.getElementById('adtv-wrap');if(w)w.style.display='none';}}
+  if(id==='admin'){rAdmin();if(typeof renderTabsVisAdmin==='function'){renderTabsVisAdmin();const w=document.getElementById('adtv-wrap');if(w)w.style.display='';}}
   if(id==='acomp')acInit();
   if(id==='usuarios')renderUsers();
   if(id==='estrategico')initEstrategico();
@@ -1337,7 +1362,7 @@ async function lE(){
   // Determinar layout sugerido por # evaluaciones previas
   const all=DB.evaluaciones.filter(e=>e.ejecutivo===ejId&&e.guardada);
   const prevCount=all.filter(d=>d.mes<mes).length;
-  const sugerido=(prevCount%3)+1;
+  const sugerido=(prevCount%2)+1;
   ES.layoutSugerido=sugerido;
 
   // Cargar evaluación existente si la hay
@@ -1369,19 +1394,19 @@ function renderEvalLayoutBar(){
   const cur=ES.layout;
   const sug=ES.layoutSugerido;
   let h='';
-  [1,2,3].forEach(id=>{
+  [1,2].forEach(id=>{
     const l=layouts[id];if(!l)return;
     const active=cur===id;
     h+='<button class="btn-tool" onclick="cambiarEvalLayout('+id+')" style="'+(active?'background:var(--acc);color:#fff;border-color:var(--acc);':'')+'">';
-    h+='L'+id+' — '+l.nombre;
+    h+=l.nombre;
     if(sug===id&&!active)h+=' <span style="font-size:9px;background:var(--am2);color:var(--am);padding:1px 5px;border-radius:8px;margin-left:4px;">sugerido</span>';
     h+='</button>';
   });
   document.getElementById('e-layout-btns').innerHTML=h;
   document.getElementById('e-layout-desc').innerHTML='<strong>🎯 Objetivo: </strong>'+(layouts[cur]?.objetivo||'');
   const meta=document.getElementById('e-layout-meta');
-  if(sug!==cur)meta.innerHTML='<span style="color:var(--am);">⚠ Layout '+cur+' (sugerido era L'+sug+')</span>';
-  else meta.innerHTML='<span style="color:var(--gn);">✓ Layout sugerido para esta evaluación</span>';
+  if(sug!==cur)meta.innerHTML='<span style="color:var(--am);">⚠ Opción '+cur+' (sugerida era Opción '+sug+')</span>';
+  else meta.innerHTML='<span style="color:var(--gn);">✓ Opción sugerida para esta evaluación</span>';
 }
 
 function cambiarEvalLayout(id){
@@ -1480,7 +1505,7 @@ function guardar(){
   if(idx>=0)DB.evaluaciones[idx]=obj;else DB.evaluaciones.push(obj);
   save();
   if(USE_SUPABASE)sbSaveEval(obj);
-  alert('Evaluación guardada. Layout '+ES.layout+' · Score: '+s+'/100');if(document.getElementById('vw-acomp')&&document.getElementById('vw-acomp').classList.contains('active'))acRender();
+  alert('Evaluación guardada. Opción '+ES.layout+' · Score: '+s+'/100');if(document.getElementById('vw-acomp')&&document.getElementById('vw-acomp').classList.contains('active'))acRender();
   rD();
 }
 
@@ -1563,7 +1588,7 @@ function renderEvalLayoutsAdmin(){
 
   // Tabs
   let h='<div style="display:flex;gap:4px;padding:10px 18px 0;border-bottom:1px solid var(--bd);">';
-  [1,2,3].forEach(id=>{
+  [1,2].forEach(id=>{
     const l=layouts[id];if(!l)return;
     const active=cur===id;
     h+='<button class="subtab'+(active?' active':'')+'" onclick="setAdminEvalLayout('+id+')">L'+id+' — '+l.nombre+'</button>';
@@ -1791,7 +1816,7 @@ function acRender(){
 
     // Última evaluación específica
     const ultEval=evals.filter(e=>e.ejecutivo===ej.id&&e.guardada&&e.score!==null).sort((a,b)=>b.mes.localeCompare(a.mes))[0];
-    const ueCell=ultEval?'<span style="font-size:11px;">'+mL(ultEval.mes)+'</span> <span style="font-size:10px;color:'+sc(ultEval.score)+';font-weight:600;">'+ultEval.score+'</span>'+(ultEval.layout?' <span style="font-size:9px;color:var(--t3);">L'+ultEval.layout+'</span>':''):'<span style="color:var(--t3);">—</span>';
+    const ueCell=ultEval?'<span style="font-size:11px;">'+mL(ultEval.mes)+'</span> <span style="font-size:10px;color:'+sc(ultEval.score)+';font-weight:600;">'+ultEval.score+'</span>'+(ultEval.layout?' <span style="font-size:9px;color:var(--t3);">Op'+ultEval.layout+'</span>':''):'<span style="color:var(--t3);">—</span>';
 
     // Último compromiso (de sesión más reciente)
     const lastSess=acomps.filter(a=>a.ejecutivo===ej.id).sort((a,b)=>b.fecha.localeCompare(a.fecha))[0];
@@ -1817,7 +1842,7 @@ function acVerHist(ejId){
     }else{
       const e=item.obj;
       const lyt=e.layout||e.layout_id;
-      const lytLbl=lyt?'L'+lyt+(lyt===1?' Fundamentos':lyt===2?' Aplicación':' Impacto'):'(histórica)';
+      const lytLbl=lyt?'Opción '+lyt:'(histórica)';
       h+='<div style="background:var(--surface);border:1px solid var(--bd);border-left:3px solid '+sc(e.score)+';border-radius:var(--rs);padding:12px 14px;margin-bottom:8px;"><div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;"><span style="font-size:10px;font-weight:600;color:'+sc(e.score)+';text-transform:uppercase;">📊 Evaluación</span><span style="font-size:12px;font-weight:500;">'+mL(e.mes)+'</span><span style="font-size:11px;color:var(--t3);">'+lytLbl+'</span><span style="font-size:13px;font-weight:600;color:'+sc(e.score)+';margin-left:auto;">'+e.score+'/100</span></div>'+(e.notas?'<div style="font-size:12px;color:var(--t);">'+e.notas+'</div>':'<div style="font-size:11px;color:var(--t3);font-style:italic;">Sin notas</div>')+'<div style="font-size:10px;color:var(--t3);margin-top:6px;">'+e.evaluador+'</div></div>';
     }
   });}
@@ -2021,7 +2046,7 @@ function exportarExcel(){
         const ej=gEj(ev.ejecutivo);const of=gOf(ej.oficina);
         const cScores=DB.criterios.map((_,ci)=>ev.criterios?ev.criterios[ci]:'');
         const lyt=ev.layout||ev.layout_id;
-        const lytLbl=lyt?'L'+lyt+(lyt===1?' Fundamentos':lyt===2?' Aplicación':' Impacto'):'(histórica)';
+        const lytLbl=lyt?'Opción '+lyt:'(histórica)';
         rows.push([mL(ev.mes),ej.nombre,of.nombre,ej.fase||'',lytLbl,ev.score,...cScores,ev.evaluador||'',ev.notas||'']);
       });
       const ws=XLSX.utils.aoa_to_sheet(rows);
@@ -2034,7 +2059,7 @@ function exportarExcel(){
       (DB.evaluacionesAgiles||[]).sort((a,b)=>a.mes.localeCompare(b.mes)).forEach(a=>{
         const ej=gEj(a.ejecutivo);if(!ej)return;const of=gOf(ej.oficina);
         const lyt=a.layout||a.layout_id||1;
-        const lytLbl='L'+lyt+(lyt===1?' Fundamentos':lyt===2?' Aplicación':' Impacto');
+        const lytLbl='Opción '+lyt;
         agRows.push([mL(a.mes),ej.nombre,of.nombre,ej.fase||'',lytLbl,a.score,a.evaluador||'',(a.fecha||'').split('T')[0],a.comentarios||'']);
       });
       const wsAg=XLSX.utils.aoa_to_sheet(agRows);
@@ -2626,9 +2651,13 @@ function exportPDF(modo,id){
 // ══════════════════════════════════════════════════════════
 
 // 3 LAYOUTS PARA EVALUACIÓN NORMAL (15 min · 18 preguntas c/u · sum=100)
+
+// 3 OPCIONES PARA EVALUACIÓN NORMAL — preguntas redistribuidas del banco original
+
+// 2 OPCIONES PARA EVALUACIÓN NORMAL (15 min · 18 preguntas c/u · sum=100)
 const EVAL_LAYOUTS_DEFAULT={
   1:{
-    nombre:'Fundamentos',
+    nombre:'Opción 1',
     objetivo:'Mide si el ejecutivo tiene los procesos en su lugar y conoce los conceptos básicos. Foco: disciplina como hábito instalado. Sugerido para 1ra evaluación o nuevos ingresos.',
     preguntas:[
       {texto:'Sabe su % de cumplimiento al presupuesto del mes (en $ y %) y desglosado por tipo de negocio',criterio_idx:0,pts:5,nota:'Pedir que muestre el dashboard donde lo consulta'},
@@ -2652,7 +2681,7 @@ const EVAL_LAYOUTS_DEFAULT={
     ]
   },
   2:{
-    nombre:'Aplicación',
+    nombre:'Opción 2',
     objetivo:'Mide si el ejecutivo está USANDO la información para tomar decisiones y modificar su práctica. Foco: disciplina como práctica activa. Sugerido para 2da evaluación.',
     preguntas:[
       {texto:'Identifica los productos con mayor caída en utilidad y propone una acción concreta para revertirla',criterio_idx:0,pts:5,nota:'Validar que la respuesta incluya acción, no solo el dato'},
@@ -2674,44 +2703,45 @@ const EVAL_LAYOUTS_DEFAULT={
       {texto:'Ajusta el plan de visitas semanalmente con base en hallazgos del mes',criterio_idx:5,pts:5,nota:''},
       {texto:'Las visitas se preparan con análisis previo de la situación del agente o cliente',criterio_idx:5,pts:5,nota:''}
     ]
-  },
-  3:{
-    nombre:'Impacto',
-    objetivo:'Mide si la disciplina está GENERANDO RESULTADOS medibles y si el ejecutivo anticipa problemas. Foco: disciplina como motor de resultados. Sugerido para 3ra evaluación en adelante.',
-    preguntas:[
-      {texto:'Sus decisiones del trimestre se reflejan en mejora medible del cumplimiento o del mix de cartera',criterio_idx:0,pts:5,nota:'Pedir indicador antes/después con métrica clara'},
-      {texto:'Anticipa tendencias del mes con base en datos parciales (proyección a día 10 vs cierre real)',criterio_idx:0,pts:5,nota:'Validar precisión de proyecciones previas'},
-      {texto:'Ha generado al menos un análisis propio (no estándar del tablero) que llevó a una decisión comercial',criterio_idx:0,pts:5,nota:''},
-      {texto:'Identifica oportunidades de cross-sell o up-sell basadas en análisis de cartera',criterio_idx:0,pts:5,nota:''},
-      {texto:'Tiene casos concretos de agentes reactivados que ya emiten de forma consistente',criterio_idx:1,pts:7,nota:'Pedir mínimo 2 ejemplos con métrica antes/después'},
-      {texto:'Identifica patrones de riesgo de deserción en agentes antes que los muestre el reporte',criterio_idx:1,pts:7,nota:'Validar con un caso reciente proactivo'},
-      {texto:'Sus acciones de reactivación tienen tasa de éxito medible mayor al 30%',criterio_idx:1,pts:6,nota:'Pedir cálculo: reactivados / intentos'},
-      {texto:'La conversión de su tubería ha mejorado mes a mes en los últimos 3 meses',criterio_idx:2,pts:5,nota:'Pedir comparativo mensual'},
-      {texto:'Identifica cuellos de botella recurrentes en sus tuberías y los aborda sistémicamente',criterio_idx:2,pts:4,nota:''},
-      {texto:'Las decisiones tomadas en reuniones generan resultados visibles en el siguiente reporte',criterio_idx:3,pts:6,nota:''},
-      {texto:'Lleva un seguimiento longitudinal de compromisos: tasa de cumplimiento mayor al 80%',criterio_idx:3,pts:5,nota:'Pedir tracker'},
-      {texto:'Sus proyecciones de los últimos 3 meses se cumplieron con desviación menor al 10%',criterio_idx:4,pts:7,nota:'Validar histórico'},
-      {texto:'Anticipa riesgos a la proyección con más de 10 días de antelación y los comunica formalmente',criterio_idx:4,pts:7,nota:'Pedir ejemplo reciente con fecha'},
-      {texto:'Identifica negocios "fantasma" en la proyección (probabilidad real baja) y los gestiona o retira',criterio_idx:4,pts:6,nota:''},
-      {texto:'Sus visitas se conectan con cierres específicos: puede trazar visita → negocio cerrado',criterio_idx:5,pts:5,nota:'Pedir mínimo 2 casos del último trimestre'},
-      {texto:'Las visitas ajustan estrategia del agente: hay cambios documentados en comportamiento post-visita',criterio_idx:5,pts:5,nota:''},
-      {texto:'Su plan de visitas incorpora aprendizajes de visitas pasadas, no es plantilla repetida',criterio_idx:5,pts:5,nota:''},
-      {texto:'Las visitas generan compromisos del agente que son trackeados y validados en la siguiente visita',criterio_idx:5,pts:5,nota:''}
-    ]
   }
 };
 
 function getEvalLayouts(){
   const saved=JSON.parse(localStorage.getItem('dc_eval_layouts')||'null');
-  if(saved&&saved[1]&&saved[2]&&saved[3])return saved;
+  if(saved&&saved[1]&&saved[2])return saved;
   return JSON.parse(JSON.stringify(EVAL_LAYOUTS_DEFAULT));
 }
-function saveEvalLayouts(layouts){localStorage.setItem('dc_eval_layouts',JSON.stringify(layouts));}
+function saveEvalLayouts(layouts){localStorage.setItem('dc_eval_layouts',JSON.stringify(layouts));markLayoutsDirty('eval');}
+async function publishEvalLayouts(){
+  if(!USE_SUPABASE||!SB){alert('Supabase no disponible. Cambios solo en este navegador.');return;}
+  const layouts=getEvalLayouts();
+  try{
+    const {error}=await SB.from('app_config').upsert({key:'eval_layouts',value:layouts,updated_by:SESSION?.usuario||'',updated_at:new Date().toISOString()},{onConflict:'key'});
+    if(error)throw error;
+    localStorage.setItem('dc_eval_layouts_published',JSON.stringify(layouts));
+    markLayoutsClean('eval');
+    alert('✓ Cambios publicados. Todos los usuarios verán esta versión.');
+  }catch(e){alert('Error al publicar: '+e.message);}
+}
+async function discardEvalLayouts(){
+  if(!confirm('¿Descartar cambios locales y recargar la versión publicada de la nube?'))return;
+  if(!USE_SUPABASE||!SB){localStorage.removeItem('dc_eval_layouts');markLayoutsClean('eval');renderEvalLayoutsAdmin();return;}
+  try{
+    const {data}=await SB.from('app_config').select('value').eq('key','eval_layouts').maybeSingle();
+    if(data&&data.value){localStorage.setItem('dc_eval_layouts',JSON.stringify(data.value));localStorage.setItem('dc_eval_layouts_published',JSON.stringify(data.value));}
+    else{localStorage.removeItem('dc_eval_layouts');localStorage.removeItem('dc_eval_layouts_published');}
+    markLayoutsClean('eval');renderEvalLayoutsAdmin();
+  }catch(e){alert('Error al recargar: '+e.message);}
+}
 function getEvalConfig(layoutId){
   const ls=getEvalLayouts();
   const id=layoutId||1;
   return ls[id]?ls[id].preguntas:EVAL_LAYOUTS_DEFAULT[1].preguntas.slice();
 }
+
+// Dirty flag (cambios sin publicar)
+function markLayoutsDirty(kind){const el=document.getElementById('layouts-dirty-'+kind);if(el)el.style.display='inline-flex';}
+function markLayoutsClean(kind){const el=document.getElementById('layouts-dirty-'+kind);if(el)el.style.display='none';}
 
 // 3 LAYOUTS PARA EVALUACIÓN ÁGIL (5-7 min · 15 preguntas)
 const AGIL_LAYOUTS_DEFAULT={
@@ -2785,7 +2815,28 @@ function getAgilLayouts(){
   if(saved&&saved[1]&&saved[2]&&saved[3])return saved;
   return JSON.parse(JSON.stringify(AGIL_LAYOUTS_DEFAULT));
 }
-function saveAgilLayouts(layouts){localStorage.setItem('dc_agil_layouts',JSON.stringify(layouts));}
+function saveAgilLayouts(layouts){localStorage.setItem('dc_agil_layouts',JSON.stringify(layouts));markLayoutsDirty('agil');}
+async function publishAgilLayouts(){
+  if(!USE_SUPABASE||!SB){alert('Supabase no disponible.');return;}
+  const layouts=getAgilLayouts();
+  try{
+    const {error}=await SB.from('app_config').upsert({key:'agil_layouts',value:layouts,updated_by:SESSION?.usuario||'',updated_at:new Date().toISOString()},{onConflict:'key'});
+    if(error)throw error;
+    localStorage.setItem('dc_agil_layouts_published',JSON.stringify(layouts));
+    markLayoutsClean('agil');
+    alert('✓ Cambios publicados.');
+  }catch(e){alert('Error: '+e.message);}
+}
+async function discardAgilLayouts(){
+  if(!confirm('¿Descartar cambios locales?'))return;
+  if(!USE_SUPABASE||!SB){localStorage.removeItem('dc_agil_layouts');markLayoutsClean('agil');renderAgilConfigAdmin();return;}
+  try{
+    const {data}=await SB.from('app_config').select('value').eq('key','agil_layouts').maybeSingle();
+    if(data&&data.value){localStorage.setItem('dc_agil_layouts',JSON.stringify(data.value));localStorage.setItem('dc_agil_layouts_published',JSON.stringify(data.value));}
+    else{localStorage.removeItem('dc_agil_layouts');localStorage.removeItem('dc_agil_layouts_published');}
+    markLayoutsClean('agil');renderAgilConfigAdmin();
+  }catch(e){alert('Error: '+e.message);}
+}
 function resetAgilLayouts(){if(!confirm('¿Restaurar los 3 layouts por defecto? Se perderán las personalizaciones.'))return;localStorage.removeItem('dc_agil_layouts');renderAgilConfigAdmin();}
 
 // Helper para mantener compatibilidad con código anterior
@@ -2858,7 +2909,7 @@ function renderLayoutBar(){
     const l=layouts[id];if(!l)return;
     const active=cur===id;
     h+='<button class="btn-tool'+(active?'':'')+'" onclick="cambiarLayout('+id+')" style="'+(active?'background:var(--acc);color:#fff;border-color:var(--acc);':'')+'">';
-    h+='L'+id+' — '+l.nombre;
+    h+=l.nombre;
     if(sug===id&&!active)h+=' <span style="font-size:9px;background:var(--am2);color:var(--am);padding:1px 5px;border-radius:8px;margin-left:4px;">sugerido</span>';
     h+='</button>';
   });
@@ -3036,7 +3087,16 @@ const TABS_DEF=[
   {id:'agil',label:'⚡ Eval. Ágil'}
 ];
 function getTabsVis(){return JSON.parse(localStorage.getItem('dc_tabs_vis')||'null')||{};}
-function setTabVis(id,visible){const v=getTabsVis();v[id]=visible;localStorage.setItem('dc_tabs_vis',JSON.stringify(v));applyTabsVis();}
+function setTabVis(id,visible){
+  const v=getTabsVis();v[id]=visible;
+  localStorage.setItem('dc_tabs_vis',JSON.stringify(v));
+  applyTabsVis();
+  if(USE_SUPABASE&&SB){
+    SB.from('app_config').upsert({key:'tabs_vis',value:v,updated_by:SESSION?.usuario||'',updated_at:new Date().toISOString()},{onConflict:'key'}).then(({error})=>{
+      if(error)console.error('Error sync tabs_vis:',error);
+    });
+  }
+}
 function applyTabsVis(){
   const v=getTabsVis();
   TABS_DEF.forEach(t=>{
