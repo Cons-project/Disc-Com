@@ -1240,7 +1240,7 @@ function sv(id){
   if(id==='dashboard')rD();
   if(id==='evolución'||id==='evolucion')rEvo();
   if(id==='oficinas')rOf();
-  if(id==='admin')rAdmin();
+  if(id==='admin'){rAdmin();if(SESSION?.rol==='super_admin'&&typeof renderTabsVisAdmin==='function'){renderTabsVisAdmin();const w=document.getElementById('adtv-wrap');if(w)w.style.display='';}else{const w=document.getElementById('adtv-wrap');if(w)w.style.display='none';}}
   if(id==='acomp')acInit();
   if(id==='usuarios')renderUsers();
   if(id==='estrategico')initEstrategico();
