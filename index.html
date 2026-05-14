@@ -1201,7 +1201,7 @@ async function sbInit(){
     if(ejs&&ejs.length)DB.ejecutivos=ejs.map(e=>({id:e.id,nombre:e.nombre,oficina:e.oficina_id,fase:e.fase||''}));
     const {data:evs}=await SB.from('evaluaciones').select('id,ejecutivo_id,mes,score,scores_criterios,notas,guardada,detalle_checks,bancos_sel,evaluador');
     if(evs&&evs.length){
-      DB.evaluaciones=evs.map(ev=>({id:ev.id,ejecutivo:ev.ejecutivo_id,mes:ev.mes,score:ev.score,criterios:ev.scores_criterios,notas:ev.notas||'',guardada:ev.guardada,evaluador:ev.evaluador||'',detalle:ev.detalle_checks||null,bancos:ev.bancos_sel||null,layout:ev.layout_id||null,layout_id:ev.layout_id||null}));
+      DB.evaluaciones=evs.map(ev=>({id:ev.id,sb_id:ev.id,ejecutivo:ev.ejecutivo_id,mes:ev.mes,score:ev.score,criterios:ev.scores_criterios,notas:ev.notas||'',guardada:ev.guardada,evaluador:ev.evaluador||'',detalle:ev.detalle_checks||null,bancos:ev.bancos_sel||null,layout:ev.layout_id||null,layout_id:ev.layout_id||null,fecha:ev.fecha||null}));
     }else DB.evaluaciones=[];
     // MVP3: Load Ágil evaluations
     try{
@@ -1238,14 +1238,27 @@ async function sbInit(){
 async function sbSaveEval(obj){
   if(!SB)return;
   try{
-    const {data,error}=await SB.from('evaluaciones').upsert({
-      ejecutivo_id:obj.ejecutivo,mes:obj.mes,score:obj.score,scores_criterios:obj.criterios,
-      notas:obj.notas,guardada:obj.guardada,evaluador:obj.evaluador||SESSION?.usuario||'',
-      detalle_checks:obj.detalle,bancos_sel:obj.bancos,layout_id:obj.layout||obj.layout_id||1
-    },{onConflict:'ejecutivo_id,mes'}).select('id').single();
-    if(error)throw error;
-    const idx=DB.evaluaciones.findIndex(e=>e.ejecutivo===obj.ejecutivo&&e.mes===obj.mes);
-    if(idx>=0)DB.evaluaciones[idx].id=data.id;
+    const fechaIso=obj.fecha||new Date().toISOString();
+    // Si ya tiene id real (uuid), actualizar; si no, insertar nuevo
+    if(obj.sb_id){
+      const {error}=await SB.from('evaluaciones').update({
+        score:obj.score,scores_criterios:obj.criterios,
+        notas:obj.notas,guardada:obj.guardada,evaluador:obj.evaluador||SESSION?.usuario||'',
+        detalle_checks:obj.detalle,bancos_sel:obj.bancos,layout_id:obj.layout||obj.layout_id||1,
+        fecha:fechaIso
+      }).eq('id',obj.sb_id);
+      if(error)throw error;
+    }else{
+      const {data,error}=await SB.from('evaluaciones').insert({
+        ejecutivo_id:obj.ejecutivo,mes:obj.mes,score:obj.score,scores_criterios:obj.criterios,
+        notas:obj.notas,guardada:obj.guardada,evaluador:obj.evaluador||SESSION?.usuario||'',
+        detalle_checks:obj.detalle,bancos_sel:obj.bancos,layout_id:obj.layout||obj.layout_id||1,
+        fecha:fechaIso
+      }).select('id').single();
+      if(error)throw error;
+      const idx=DB.evaluaciones.findIndex(e=>e.id===obj.id);
+      if(idx>=0){DB.evaluaciones[idx].sb_id=data.id;DB.evaluaciones[idx].id=data.id;}
+    }
     save();
   }catch(e){console.error('SB save eval:',e);}
 }
@@ -1260,7 +1273,16 @@ async function sbAddEjecutivo(nombre,oficina_id,fase=''){if(!SB)return null;cons
 // ══════════════════════════════════════════════════════════
 function gOf(id){return DB.oficinas.find(o=>o.id===id)||{nombre:'?'};}
 function gEj(id){return DB.ejecutivos.find(e=>e.id===id)||{nombre:'?'};}
-function gEv(ejId,mes){return DB.evaluaciones.find(e=>e.ejecutivo===ejId&&e.mes===mes);}
+// gEv: última (más reciente por fecha) evaluación guardada del ejecutivo en ese mes
+function gEv(ejId,mes){
+  const all=DB.evaluaciones.filter(e=>e.ejecutivo===ejId&&e.mes===mes&&e.guardada);
+  if(!all.length)return DB.evaluaciones.find(e=>e.ejecutivo===ejId&&e.mes===mes);
+  return all.sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''))[0];
+}
+// gEvAll: todas las evaluaciones del ejecutivo en ese mes (para evolución/historial)
+function gEvAll(ejId,mes){return DB.evaluaciones.filter(e=>e.ejecutivo===ejId&&e.mes===mes&&e.guardada).sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||''));}
+// gUltimaEval: última eval guardada del ejecutivo (cualquier mes)
+function gUltimaEval(ejId){return DB.evaluaciones.filter(e=>e.ejecutivo===ejId&&e.guardada).sort((a,b)=>{const c=b.mes.localeCompare(a.mes);return c!==0?c:(b.fecha||'').localeCompare(a.fecha||'');})[0];}
 function gPrev(ejId,mes){return DB.evaluaciones.filter(e=>e.ejecutivo===ejId&&e.mes<mes&&e.guardada).sort((a,b)=>b.mes.localeCompare(a.mes))[0];}
 function mL(m){const[y,mo]=m.split('-');return MN[parseInt(mo)-1]+' '+y;}
 function sc(s){return s>=80?'#1A7A52':s>=60?'#8A5C00':'#A52A2A';}
@@ -1308,12 +1330,18 @@ function rD(){
   const ejIds=new Set(ejFiltrados.map(e=>e.id));
   const evsAll=DB.evaluaciones.filter(e=>e.mes===mes);
   const evs=evsAll.filter(e=>ejIds.has(e.ejecutivo));
-  const em={};evsAll.forEach(e=>{em[e.ejecutivo]=e;});
+  // Dedup: dejar solo la más reciente por ejecutivo (criterio: fecha desc)
+  const em={};
+  evsAll.forEach(e=>{
+    if(!em[e.ejecutivo]||(e.fecha||'').localeCompare(em[e.ejecutivo].fecha||'')>0)em[e.ejecutivo]=e;
+  });
+  // Para conteos usar versiones únicas por ejecutivo
+  const evsUnicas=Object.values(em).filter(e=>ejIds.has(e.ejecutivo));
   const tot=ejFiltrados.length;
-  const evd=evs.filter(e=>e.guardada).length;
-  const tr=evs.filter(e=>!e.guardada).length;
+  const evd=evsUnicas.filter(e=>e.guardada).length;
+  const tr=evsUnicas.filter(e=>!e.guardada).length;
   const pend=tot-evd-tr;
-  const grd=evs.filter(e=>e.guardada);
+  const grd=evsUnicas.filter(e=>e.guardada);
   const avg=grd.length?Math.round(grd.reduce((s,e)=>s+e.score,0)/grd.length):0;
   const sol=grd.filter(e=>e.score>=80).length;
   document.getElementById('dt').textContent='Dashboard - '+mL(mes);
@@ -1359,31 +1387,28 @@ async function lE(){
   document.getElementById('eempty').style.display='none';
   document.getElementById('ewrap').style.display='block';
 
-  // Determinar layout sugerido por # evaluaciones previas
-  const all=DB.evaluaciones.filter(e=>e.ejecutivo===ejId&&e.guardada);
-  const prevCount=all.filter(d=>d.mes<mes).length;
-  const sugerido=(prevCount%2)+1;
-  ES.layoutSugerido=sugerido;
+  // Reset estado — cada evaluación es NUEVA, no se precarga
+  ES.sb_id=null;
+  ES.local_id=null;
 
-  // Cargar evaluación existente si la hay
-  const ex=gEv(ejId,mes);
-  if(ex&&ex.layout){ES.layout=ex.layout;}
-  else if(ex&&ex.layout_id){ES.layout=ex.layout_id;}
-  else{ES.layout=sugerido;}
+  // Determinar layout sugerido por # evaluaciones previas (todas las históricas + del mes)
+  const allPrev=DB.evaluaciones.filter(e=>e.ejecutivo===ejId&&e.guardada&&e.mes<=mes);
+  const sugerido=(allPrev.length%2)+1;
+  ES.layoutSugerido=sugerido;
+  ES.layout=sugerido;
 
   const config=getEvalConfig(ES.layout);
   ES.c=config.map(()=>false);
+  document.getElementById('enotas').value='';
 
-  if(ex&&ex.detalle&&Array.isArray(ex.detalle)){
-    // Si detalle es array plano (nuevo formato layout)
-    if(typeof ex.detalle[0]==='boolean'||ex.detalle[0]===0||ex.detalle[0]===1){
-      ex.detalle.forEach((v,i)=>{if(i<ES.c.length)ES.c[i]=!!v;});
-    }
-    document.getElementById('enotas').value=ex.notas||'';
-  }else{document.getElementById('enotas').value='';}
-
+  // Mostrar info de evaluaciones previas del mismo mes
+  const evsMes=gEvAll(ejId,mes);
   const prev=gPrev(ejId,mes);
-  document.getElementById('eprev').innerHTML=prev?'Previo: <b>'+mL(prev.mes)+'</b> '+sBd(prev.score):'Sin evaluaciones previas';
+  let prevHtml=prev?'Previo: <b>'+mL(prev.mes)+'</b> '+sBd(prev.score):'Sin evaluaciones previas';
+  if(evsMes.length>0){
+    prevHtml+=' · <span style="color:var(--am);">⚠ '+evsMes.length+' eval(s) ya este mes: '+evsMes.map(e=>e.score+'p').join(', ')+'</span>';
+  }
+  document.getElementById('eprev').innerHTML=prevHtml;
 
   renderEvalLayoutBar();
   rESc();
@@ -1451,11 +1476,14 @@ function autoSave(){
   const ejId=document.getElementById('eej').value;
   const mes=document.getElementById('emes').value;
   if(!ejId)return;
-  const idx=DB.evaluaciones.findIndex(e=>e.ejecutivo===ejId&&e.mes===mes);
-  const obj={id:idx>=0?DB.evaluaciones[idx].id:'ev'+Date.now(),ejecutivo:ejId,mes,score:null,criterios:null,notas:document.getElementById('enotas').value,guardada:false,evaluador:SESSION?.usuario||'',detalle:ES.c.slice(),bancos:null,layout:ES.layout,layout_id:ES.layout};
+  // Si ya tiene un local_id (esta sesión), actualizamos; si no, creamos uno nuevo
+  if(!ES.local_id)ES.local_id='ev'+Date.now();
+  const idx=DB.evaluaciones.findIndex(e=>e.id===ES.local_id||(ES.sb_id&&e.sb_id===ES.sb_id));
+  const fecha=new Date().toISOString();
+  const obj={id:ES.local_id,sb_id:ES.sb_id||null,ejecutivo:ejId,mes,score:null,criterios:null,notas:document.getElementById('enotas').value,guardada:false,evaluador:SESSION?.usuario||'',detalle:ES.c.slice(),bancos:null,layout:ES.layout,layout_id:ES.layout,fecha};
   if(idx>=0)DB.evaluaciones[idx]=obj;else DB.evaluaciones.push(obj);
   save();
-  if(USE_SUPABASE)sbSaveEval(obj);
+  // No sincronizar a Supabase mientras es borrador (guardada=false)
 }
 
 function uS(){
@@ -1500,12 +1528,18 @@ function guardar(){
   let tot=0;const cS=[];
   DB.criterios.forEach((c,ci)=>{const pc=porCrit[ci]||{got:0,max:0};const pct=pc.max?Math.round((pc.got/pc.max)*100):0;cS.push(pct);tot+=pc.got;});
   const s=Math.round(tot);
-  const idx=DB.evaluaciones.findIndex(e=>e.ejecutivo===ejId&&e.mes===mes);
-  const obj={id:idx>=0?DB.evaluaciones[idx].id:'ev'+Date.now(),ejecutivo:ejId,mes,score:s,criterios:cS,notas,guardada:true,evaluador:SESSION?.usuario||'',detalle:ES.c.slice(),bancos:null,layout:ES.layout,layout_id:ES.layout};
+  // SIEMPRE nueva: nunca sobrescribe (modelo 1 eval = 1 registro)
+  if(!ES.local_id)ES.local_id='ev'+Date.now();
+  const fecha=new Date().toISOString();
+  const obj={id:ES.local_id,sb_id:ES.sb_id||null,ejecutivo:ejId,mes,score:s,criterios:cS,notas,guardada:true,evaluador:SESSION?.usuario||'',detalle:ES.c.slice(),bancos:null,layout:ES.layout,layout_id:ES.layout,fecha};
+  const idx=DB.evaluaciones.findIndex(e=>e.id===ES.local_id);
   if(idx>=0)DB.evaluaciones[idx]=obj;else DB.evaluaciones.push(obj);
   save();
   if(USE_SUPABASE)sbSaveEval(obj);
-  alert('Evaluación guardada. Opción '+ES.layout+' · Score: '+s+'/100');if(document.getElementById('vw-acomp')&&document.getElementById('vw-acomp').classList.contains('active'))acRender();
+  alert('Evaluación guardada como NUEVO registro. Opción '+ES.layout+' · Score: '+s+'/100');
+  if(document.getElementById('vw-acomp')&&document.getElementById('vw-acomp').classList.contains('active'))acRender();
+  // Reset para permitir nueva evaluación
+  ES.sb_id=null;ES.local_id=null;
   rD();
 }
 
@@ -1570,7 +1604,10 @@ function rAdmin(){
   // Restrict criteria editing to super_admin
   const isSA=SESSION?.rol==='super_admin';
   document.getElementById('adcr-wrap').style.display=isSA?'':'none';
-  let oh='';DB.oficinas.forEach(o=>{oh+='<div class="ai"><input class="ed" value="'+o.nombre+'" onblur="uOf(\''+o.id+'\',this.value)"><span style="font-size:12px;color:var(--t2);">'+DB.ejecutivos.filter(e=>e.oficina===o.id).length+' ejecutivos</span></div>';});
+  let oh='';DB.oficinas.forEach(o=>{
+    const ejecs=DB.ejecutivos.filter(e=>e.oficina===o.id).length;
+    oh+='<div class="ai"><input class="ed" value="'+o.nombre+'" onblur="uOf(\''+o.id+'\',this.value)"><span style="font-size:12px;color:var(--t2);">'+ejecs+' ejecutivos</span><button class="btn btn-sm btn-danger" onclick="dOf(\''+o.id+'\')" '+(ejecs>0?'disabled title="No se puede eliminar: tiene ejecutivos"':'')+'>Eliminar</button></div>';
+  });
   document.getElementById('adof').innerHTML=oh||'<div class="empty">Sin oficinas</div>';
   let eh='';DB.ejecutivos.forEach(ej=>{eh+='<div class="ai"><input class="ed" value="'+ej.nombre+'" onblur="uEjN(\''+ej.id+'\',this.value)"><select class="sel" onchange="uEjO(\''+ej.id+'\',this.value)">'+DB.oficinas.map(o=>'<option value="'+o.id+'"'+(o.id===ej.oficina?' selected':'')+'>'+o.nombre+'</option>').join('')+'</select><input class="inp" value="'+(ej.fase||'')+'" placeholder="Fase (opcional)" maxlength="30" style="width:140px;" onblur="uEjFase(\''+ej.id+'\',this.value)"><button class="btn btn-sm btn-danger" onclick="dEj(\''+ej.id+'\')">Eliminar</button></div>';});
   document.getElementById('adej').innerHTML=eh||'<div class="empty">Sin ejecutivos</div>';
@@ -1595,12 +1632,18 @@ function renderEvalLayoutsAdmin(){
   });
   h+='</div>';
 
-  // Objetivo + suma
+  // Nombre + Objetivo editables + suma
   const totalPts=preguntas.reduce((s,p)=>s+(p.pts||0),0);
-  h+='<div style="padding:12px 18px;background:var(--bg);border-bottom:1px solid var(--bd);font-size:11px;color:var(--t2);">';
-  h+='<strong>Layout '+cur+' — '+layouts[cur].nombre+':</strong> '+layouts[cur].objetivo;
+  h+='<div style="padding:12px 18px;background:var(--bg);border-bottom:1px solid var(--bd);">';
+  h+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">';
+  h+='<span style="font-size:11px;color:var(--t2);min-width:60px;">Nombre:</span>';
+  h+='<input class="ed" value="'+(layouts[cur].nombre||'').replace(/"/g,'&quot;')+'" onblur="setEvalLayoutNombre(this.value)" style="flex:1;font-size:13px;font-weight:600;">';
   h+='</div>';
-  h+='<div style="padding:8px 18px;background:'+(totalPts===100?'var(--gn2)':'var(--am2)')+';color:'+(totalPts===100?'var(--gn)':'var(--am)')+';font-size:11px;font-weight:600;">Suma Layout '+cur+': '+totalPts+'/100 puntos '+(totalPts===100?'✓':'⚠ debe sumar 100')+'</div>';
+  h+='<div style="display:flex;align-items:flex-start;gap:10px;">';
+  h+='<span style="font-size:11px;color:var(--t2);min-width:60px;padding-top:6px;">Objetivo:</span>';
+  h+='<textarea class="ed" onblur="setEvalLayoutObjetivo(this.value)" style="flex:1;font-size:11px;min-height:50px;font-family:inherit;">'+(layouts[cur].objetivo||'')+'</textarea>';
+  h+='</div></div>';
+  h+='<div style="padding:8px 18px;background:'+(totalPts===100?'var(--gn2)':'var(--am2)')+';color:'+(totalPts===100?'var(--gn)':'var(--am)')+';font-size:11px;font-weight:600;">Suma '+layouts[cur].nombre+': '+totalPts+'/100 puntos '+(totalPts===100?'✓':'⚠ debe sumar 100')+'</div>';
 
   // Agrupar preguntas por criterio
   const porCrit={};
@@ -1645,6 +1688,8 @@ function renderEvalLayoutsAdmin(){
 
 function setEvalLayoutTexto(i,v){const ls=getEvalLayouts();if(ls[ADMIN_EVAL_LAYOUT_SEL].preguntas[i]){ls[ADMIN_EVAL_LAYOUT_SEL].preguntas[i].texto=v;saveEvalLayouts(ls);}}
 function setEvalLayoutPts(i,v){const ls=getEvalLayouts();if(ls[ADMIN_EVAL_LAYOUT_SEL].preguntas[i]){ls[ADMIN_EVAL_LAYOUT_SEL].preguntas[i].pts=parseInt(v)||1;saveEvalLayouts(ls);renderEvalLayoutsAdmin();}}
+function setEvalLayoutNombre(v){const ls=getEvalLayouts();if(ls[ADMIN_EVAL_LAYOUT_SEL]){ls[ADMIN_EVAL_LAYOUT_SEL].nombre=v||'Opción '+ADMIN_EVAL_LAYOUT_SEL;saveEvalLayouts(ls);renderEvalLayoutsAdmin();}}
+function setEvalLayoutObjetivo(v){const ls=getEvalLayouts();if(ls[ADMIN_EVAL_LAYOUT_SEL]){ls[ADMIN_EVAL_LAYOUT_SEL].objetivo=v;saveEvalLayouts(ls);}}
 function setEvalLayoutNota(i,v){const ls=getEvalLayouts();if(ls[ADMIN_EVAL_LAYOUT_SEL].preguntas[i]){ls[ADMIN_EVAL_LAYOUT_SEL].preguntas[i].nota=v;saveEvalLayouts(ls);}}
 function addEvalPregunta(ci){
   const ls=getEvalLayouts();
@@ -1662,6 +1707,17 @@ function resetEvalLayouts(){
   localStorage.removeItem('dc_eval_layouts');renderEvalLayoutsAdmin();
 }
 
+async function sbDeleteOficina(id){if(!SB)return;await SB.from('oficinas').delete().eq('id',id);}
+function dOf(id){
+  const o=DB.oficinas.find(of=>of.id===id);if(!o)return;
+  const ejecs=DB.ejecutivos.filter(e=>e.oficina===id).length;
+  if(ejecs>0){alert('No se puede eliminar "'+o.nombre+'" porque tiene '+ejecs+' ejecutivos asignados. Reasigna o elimina los ejecutivos primero.');return;}
+  if(!confirm('¿Eliminar oficina "'+o.nombre+'"? Esta acción no se puede deshacer.'))return;
+  DB.oficinas=DB.oficinas.filter(of=>of.id!==id);
+  save();
+  if(USE_SUPABASE)sbDeleteOficina(id);
+  rAdmin();
+}
 function uOf(id,v){const l=v.trim();if(!l)return;const d=DB.oficinas.find(o=>o.id!==id&&o.nombre.toLowerCase()===l.toLowerCase());if(d){alert('Ya existe: '+d.nombre);rAdmin();return;}const o=DB.oficinas.find(o=>o.id===id);if(o){o.nombre=l;save();if(USE_SUPABASE)sbSaveOficina(id,l);}}
 function uEjN(id,v){const e=DB.ejecutivos.find(e=>e.id===id);if(e){e.nombre=v;save();if(USE_SUPABASE)sbSaveEjecutivo(id,v,e.oficina,e.fase||'');}
 }
