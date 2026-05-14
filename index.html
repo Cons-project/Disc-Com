@@ -296,11 +296,13 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFAF8;}
     <button class="ntb" id="nb-oficinas" onclick="sv('oficinas')">Por oficina</button>
     <button class="ntb" id="nb-acomp" onclick="sv('acomp')">Acompañamiento</button>
     <button class="ntb" id="nb-estrategico" onclick="sv('estrategico')">📊 Reporte Estratégico</button>
+    <button class="ntb" id="nb-historial" onclick="sv('historial')">📋 Historial</button>
     <button class="ntb" id="nb-agil" onclick="sv('agil')">⚡ Eval. Ágil</button>
     <button class="ntb" id="nb-admin" onclick="sv('admin')">Administración</button>
     <button class="ntb" id="nb-usuarios" onclick="sv('usuarios')" style="display:none;">Usuarios</button>
   </div>
   <div class="nu">
+    <button class="btn btn-sm" onclick="refreshAll()" id="btn-refresh" title="Recargar datos de la BD y refrescar todas las pestañas" style="background:var(--acc);color:#fff;">↻ Actualizar</button>
     <span class="nu-name" id="nu-name">—</span>
     <span class="nu-role" id="nu-role">—</span>
     <button class="logout-btn" onclick="doLogout()">Salir</button>
@@ -547,6 +549,38 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFAF8;}
       <select class="sel" id="hc-ejecutivo" onchange="rHistComentarios()" style="min-width:280px;"><option value="">Selecciona un ejecutivo</option></select>
     </div>
     <div id="hc-timeline"></div>
+  </div>
+</div>
+
+<!-- Historial de Evaluaciones -->
+<div class="vw" id="vw-historial">
+  <div class="pt">📋 Historial de Evaluaciones</div><div class="ps">Todas las evaluaciones registradas, conectadas a la base de datos</div>
+
+  <div style="background:var(--surface);border:1px solid var(--bd);border-radius:var(--r);padding:16px;margin-bottom:18px;display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
+    <div style="flex:1;min-width:160px;">
+      <label style="font-size:11px;color:var(--t2);display:block;margin-bottom:5px;">Buscar ejecutivo</label>
+      <input class="inp" id="hist-q" placeholder="Nombre..." oninput="renderHistorial()" style="width:100%;">
+    </div>
+    <div>
+      <label style="font-size:11px;color:var(--t2);display:block;margin-bottom:5px;">Oficina</label>
+      <select class="sel" id="hist-of" onchange="renderHistorial()"><option value="">Todas</option></select>
+    </div>
+    <div>
+      <label style="font-size:11px;color:var(--t2);display:block;margin-bottom:5px;">Mes</label>
+      <select class="sel" id="hist-mes" onchange="renderHistorial()"><option value="">Todos</option></select>
+    </div>
+    <div>
+      <label style="font-size:11px;color:var(--t2);display:block;margin-bottom:5px;">Tipo</label>
+      <select class="sel" id="hist-tipo" onchange="renderHistorial()"><option value="">Todas</option><option value="normal">Normal</option><option value="agil">Ágil</option></select>
+    </div>
+    <button class="btn btn-sm" onclick="refreshAll()">↻ Actualizar</button>
+  </div>
+
+  <div style="background:var(--surface);border:1px solid var(--bd);border-radius:var(--r);overflow:hidden;">
+    <div class="th2"><span class="tt" id="hist-tl">Evaluaciones</span></div>
+    <div style="overflow-x:auto;">
+      <table><thead><tr><th>Fecha</th><th>Mes</th><th>Ejecutivo</th><th>Oficina</th><th>Tipo</th><th>Opción/Layout</th><th>Score</th><th>Evaluador</th><th>Notas</th></tr></thead><tbody id="hist-tbody"></tbody></table>
+    </div>
   </div>
 </div>
 
@@ -1311,6 +1345,76 @@ function sv(id){
   if(id==='usuarios')renderUsers();
   if(id==='estrategico')initEstrategico();
   if(id==='agil')initAgil();
+  if(id==='historial')initHistorial();
+}
+
+// ── Actualizar global: recarga BD y refresca la pestaña activa ──
+async function refreshAll(){
+  const btn=document.getElementById('btn-refresh');
+  if(btn){btn.textContent='↻ Actualizando...';btn.disabled=true;}
+  try{
+    if(USE_SUPABASE&&typeof sbInit==='function'){await sbInit();}
+    // Refrescar la pestaña activa
+    const active=document.querySelector('.vw.active');
+    if(active){
+      const id=active.id.replace('vw-','');
+      if(id==='dashboard')rD();
+      else if(id==='evolución'||id==='evolucion')rEvo();
+      else if(id==='oficinas')rOf();
+      else if(id==='acomp')acRender();
+      else if(id==='estrategico')initEstrategico();
+      else if(id==='historial')renderHistorial();
+      else if(id==='agil'){}
+      else if(id==='admin')rAdmin();
+    }
+  }catch(e){console.error('refreshAll:',e);}
+  if(btn){btn.textContent='↻ Actualizar';btn.disabled=false;}
+}
+
+// ── Historial de evaluaciones ──
+function initHistorial(){
+  const ofSel=document.getElementById('hist-of');
+  if(ofSel&&ofSel.options.length<=1){
+    DB.oficinas.forEach(o=>{ofSel.innerHTML+='<option value="'+o.id+'">'+o.nombre+'</option>';});
+  }
+  const mesSel=document.getElementById('hist-mes');
+  if(mesSel&&mesSel.options.length<=1){
+    const meses=[...new Set(DB.evaluaciones.concat(DB.evaluacionesAgiles||[]).map(e=>e.mes))].filter(Boolean).sort().reverse();
+    meses.forEach(m=>{mesSel.innerHTML+='<option value="'+m+'">'+mL(m)+'</option>';});
+  }
+  renderHistorial();
+}
+function renderHistorial(){
+  const q=(document.getElementById('hist-q').value||'').toLowerCase();
+  const of=document.getElementById('hist-of').value;
+  const mes=document.getElementById('hist-mes').value;
+  const tipo=document.getElementById('hist-tipo').value;
+  // Combinar normales + ágiles
+  let rows=[];
+  if(tipo!=='agil'){
+    DB.evaluaciones.filter(e=>e.guardada).forEach(e=>{
+      const ej=gEj(e.ejecutivo);if(!ej)return;
+      rows.push({fecha:e.fecha||'',mes:e.mes,ejecutivo:ej.nombre,ejId:e.ejecutivo,oficina:gOf(ej.oficina).nombre,ofId:ej.oficina,tipo:'Normal',layout:e.layout||e.layout_id,score:e.score,evaluador:e.evaluador||'',notas:e.notas||''});
+    });
+  }
+  if(tipo!=='normal'){
+    (DB.evaluacionesAgiles||[]).forEach(a=>{
+      const ej=gEj(a.ejecutivo);if(!ej)return;
+      rows.push({fecha:a.fecha||'',mes:a.mes,ejecutivo:ej.nombre,ejId:a.ejecutivo,oficina:gOf(ej.oficina).nombre,ofId:ej.oficina,tipo:'Ágil',layout:a.layout||a.layout_id,score:a.score,evaluador:a.evaluador||'',notas:a.comentarios||''});
+    });
+  }
+  if(q)rows=rows.filter(r=>normalize(r.ejecutivo).includes(normalize(q)));
+  if(of)rows=rows.filter(r=>r.ofId===of);
+  if(mes)rows=rows.filter(r=>r.mes===mes);
+  rows.sort((a,b)=>{const c=(b.fecha||'').localeCompare(a.fecha||'');return c!==0?c:b.mes.localeCompare(a.mes);});
+  document.getElementById('hist-tl').textContent='Evaluaciones ('+rows.length+')';
+  let h='';
+  rows.forEach(r=>{
+    const fechaTxt=r.fecha?r.fecha.split('T')[0]:'—';
+    const lytTxt=r.layout?(r.tipo==='Normal'?'Opción '+r.layout:'Layout '+r.layout):'—';
+    h+='<tr><td style="font-size:11px;color:var(--t2);">'+fechaTxt+'</td><td style="font-size:12px;">'+mL(r.mes)+'</td><td style="font-weight:500;">'+r.ejecutivo+'</td><td style="font-size:12px;">'+r.oficina+'</td><td><span class="badge" style="font-size:10px;background:'+(r.tipo==='Normal'?'var(--gn2)':'var(--am2)')+';color:'+(r.tipo==='Normal'?'var(--gn)':'var(--am)')+';">'+r.tipo+'</span></td><td style="font-size:11px;color:var(--t2);">'+lytTxt+'</td><td style="font-weight:600;color:'+sc(r.score)+';">'+r.score+'</td><td style="font-size:11px;color:var(--t2);">'+r.evaluador+'</td><td style="font-size:11px;color:var(--t3);max-width:200px;">'+(r.notas?r.notas.substring(0,60)+(r.notas.length>60?'...':''):'—')+'</td></tr>';
+  });
+  document.getElementById('hist-tbody').innerHTML=h||'<tr><td colspan="9" class="empty">Sin evaluaciones</td></tr>';
 }
 
 function sC(v){
@@ -1537,10 +1641,14 @@ function guardar(){
   save();
   if(USE_SUPABASE)sbSaveEval(obj);
   alert('Evaluación guardada como NUEVO registro. Opción '+ES.layout+' · Score: '+s+'/100');
-  if(document.getElementById('vw-acomp')&&document.getElementById('vw-acomp').classList.contains('active'))acRender();
-  // Reset para permitir nueva evaluación
+  // Detonar refresh completo del frontend (principio BI: Evaluar es la tabla maestra)
   ES.sb_id=null;ES.local_id=null;
   rD();
+  if(typeof rEvo==='function')rEvo();
+  if(typeof rOf==='function')rOf();
+  if(document.getElementById('vw-acomp')&&document.getElementById('vw-acomp').classList.contains('active'))acRender();
+  if(document.getElementById('vw-estrategico')&&document.getElementById('vw-estrategico').classList.contains('active'))initEstrategico();
+  if(document.getElementById('vw-historial')&&document.getElementById('vw-historial').classList.contains('active'))renderHistorial();
 }
 
 function rEvo(){
