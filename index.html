@@ -296,7 +296,7 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFAF8;}
     <button class="ntb" id="nb-oficinas" onclick="sv('oficinas')">Por oficina</button>
     <button class="ntb" id="nb-acomp" onclick="sv('acomp')">Acompañamiento</button>
     <button class="ntb" id="nb-estrategico" onclick="sv('estrategico')">📊 Reporte Estratégico</button>
-    <button class="ntb" id="nb-historial" onclick="sv('historial')">📋 Historial</button>
+    <button class="ntb" id="nb-historial" onclick="sv('historial')" style="display:none;">📋 Historial</button>
     <button class="ntb" id="nb-agil" onclick="sv('agil')">⚡ Eval. Ágil</button>
     <button class="ntb" id="nb-admin" onclick="sv('admin')">Administración</button>
     <button class="ntb" id="nb-usuarios" onclick="sv('usuarios')" style="display:none;">Usuarios</button>
@@ -438,7 +438,7 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFAF8;}
   </div>
   <div class="tw">
     <div class="th2"><span class="tt" id="ac-tl">Ejecutivos con actividad</span></div>
-    <table><thead><tr><th>Ejecutivo</th><th>Oficina</th><th>Actividad este mes</th><th>Última actividad</th><th>Última evaluación</th><th>Último compromiso</th><th>Estado</th><th></th></tr></thead><tbody id="ac-tbody"></tbody></table>
+    <table><thead><tr><th>Ejecutivo</th><th>Oficina</th><th>Actividad este mes</th><th>Última actividad</th><th>Tipo</th><th>Score</th><th>Notas</th><th>Estado</th><th></th></tr></thead><tbody id="ac-tbody"></tbody></table>
   </div>
   <div id="ac-historial-wrap" style="display:none;margin-top:20px;">
     <div style="font-size:14px;font-weight:600;margin-bottom:12px;" id="ac-hist-title">Historial</div>
@@ -1954,10 +1954,17 @@ function acRender(){
   const evals=DB.evaluaciones||[];
 
   // Helper: actividad combinada por ejecutivo (sesiones + evaluaciones guardadas)
+  // Usa la fecha REAL del registro (respeta timestamp)
   function getActividad(ejId){
-    const sess=acomps.filter(a=>a.ejecutivo===ejId).map(a=>({tipo:'sesion',fecha:a.fecha,obj:a}));
-    const evs=evals.filter(e=>e.ejecutivo===ejId&&e.guardada).map(e=>({tipo:'eval',fecha:e.mes+'-28',obj:e}));
-    return sess.concat(evs).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+    const sess=acomps.filter(a=>a.ejecutivo===ejId).map(a=>({
+      tipo:'Acompañamiento',fecha:(a.fecha||'').split('T')[0],score:null,
+      notas:a.notas||a.compromiso_nuevo||'',obj:a
+    }));
+    const evs=evals.filter(e=>e.ejecutivo===ejId&&e.guardada).map(e=>({
+      tipo:'Evaluación',fecha:(e.fecha||e.mes+'-28').split('T')[0],score:e.score,
+      notas:e.notas||'',obj:e
+    }));
+    return sess.concat(evs).sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
   }
 
   lista=lista.filter(ej=>{
@@ -1972,23 +1979,23 @@ function acRender(){
   let h='';
   lista.forEach(ej=>{
     const act=getActividad(ej.id);
-    const enMes=act.filter(a=>a.fecha.startsWith(mesActual)).length;
+    // Actividad este mes: cuenta TODOS los registros del usuario en el mes actual
+    const enMes=act.filter(a=>(a.fecha||'').startsWith(mesActual)).length;
     const last=act[0];
     const dias=last?Math.floor((new Date(hoy)-new Date(last.fecha))/(86400000)):null;
     const estado=dias===null?'<span class="badge bgr">Sin actividad</span>':dias>14?'<span class="badge br">'+dias+' días sin actividad</span>':'<span class="badge bg">Al día</span>';
-    const uf=last?last.fecha+' <span style="font-size:10px;color:var(--t3);">('+(last.tipo==='eval'?'Eval':'Sesión')+')</span>':'—';
+    // Última actividad: SOLO fecha
+    const uf=last?last.fecha:'<span style="color:var(--t3);">—</span>';
+    // Tipo de actividad (del último registro)
+    const tipoCell=last?'<span class="badge" style="font-size:10px;background:'+(last.tipo==='Evaluación'?'var(--gn2)':'var(--am2)')+';color:'+(last.tipo==='Evaluación'?'var(--gn)':'var(--am)')+';">'+last.tipo+'</span>':'<span style="color:var(--t3);">—</span>';
+    // Score (del último registro si es evaluación)
+    const scoreCell=(last&&last.score!==null&&last.score!==undefined)?'<span style="font-weight:600;color:'+sc(last.score)+';">'+last.score+'</span>':'<span style="color:var(--t3);">—</span>';
+    // Notas (del último registro)
+    const notasCell=last&&last.notas?'<span style="font-size:11px;color:var(--t2);">'+last.notas.substring(0,55)+(last.notas.length>55?'...':'')+'</span>':'<span style="color:var(--t3);">—</span>';
 
-    // Última evaluación específica
-    const ultEval=evals.filter(e=>e.ejecutivo===ej.id&&e.guardada&&e.score!==null).sort((a,b)=>b.mes.localeCompare(a.mes))[0];
-    const ueCell=ultEval?'<span style="font-size:11px;">'+mL(ultEval.mes)+'</span> <span style="font-size:10px;color:'+sc(ultEval.score)+';font-weight:600;">'+ultEval.score+'</span>'+(ultEval.layout?' <span style="font-size:9px;color:var(--t3);">Op'+ultEval.layout+'</span>':''):'<span style="color:var(--t3);">—</span>';
-
-    // Último compromiso (de sesión más reciente)
-    const lastSess=acomps.filter(a=>a.ejecutivo===ej.id).sort((a,b)=>b.fecha.localeCompare(a.fecha))[0];
-    const uc=lastSess?'<span style="font-size:12px;color:var(--t2);">'+lastSess.compromiso_nuevo.substring(0,50)+(lastSess.compromiso_nuevo.length>50?'...':'')+'</span>':'<span style="color:var(--t3);">—</span>';
-
-    h+='<tr><td style="font-weight:500">'+ej.nombre+'</td><td>'+gOf(ej.oficina).nombre+'</td><td style="font-size:13px;">'+enMes+'</td><td style="font-size:11px;color:var(--t2);">'+uf+'</td><td>'+ueCell+'</td><td>'+uc+'</td><td>'+estado+'</td><td><button class="btn btn-sm" onclick="acVerHist(\''+ej.id+'\')">Ver historial</button></td></tr>';
+    h+='<tr><td style="font-weight:500">'+ej.nombre+'</td><td>'+gOf(ej.oficina).nombre+'</td><td style="font-size:13px;">'+enMes+'</td><td style="font-size:11px;color:var(--t2);">'+uf+'</td><td>'+tipoCell+'</td><td>'+scoreCell+'</td><td>'+notasCell+'</td><td>'+estado+'</td><td><button class="btn btn-sm" onclick="acVerHist(\''+ej.id+'\')">Ver historial</button></td></tr>';
   });
-  document.getElementById('ac-tbody').innerHTML=h||'<tr><td colspan="8" class="empty">Sin resultados</td></tr>';
+  document.getElementById('ac-tbody').innerHTML=h||'<tr><td colspan="9" class="empty">Sin resultados</td></tr>';
 }
 function acVerHist(ejId){
   const ej=gEj(ejId);
@@ -2551,8 +2558,16 @@ function renderHeatmap(ejs,evs){
 function rEvoChart(){
   const nivel=document.getElementById('es-evo-nivel').value;
   const rango=parseInt(document.getElementById('es-evo-rango').value);
-  const now=new Date();const meses=[];
-  for(let i=rango-1;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1);meses.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'));}
+  const now=new Date();
+  const nowMonth=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  // Anclar el rango al mes más reciente CON evaluaciones (crea meses faltantes si la eval es posterior a "hoy")
+  const evalMonths=DB.evaluaciones.filter(e=>e.guardada).map(e=>e.mes).filter(Boolean).sort();
+  const latestEvalMonth=evalMonths.length?evalMonths[evalMonths.length-1]:null;
+  let anchorMonth=nowMonth;
+  if(latestEvalMonth&&latestEvalMonth>nowMonth)anchorMonth=latestEvalMonth;
+  const [ay,am]=anchorMonth.split('-').map(Number);
+  const meses=[];
+  for(let i=rango-1;i>=0;i--){const d=new Date(ay,am-1-i,1);meses.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'));}
   const ejs=ejecutivosFiltrados();const grupos={};
   ejs.forEach(e=>{
     let k,kid,sub;
