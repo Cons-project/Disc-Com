@@ -438,7 +438,7 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFAF8;}
   </div>
   <div class="tw">
     <div class="th2"><span class="tt" id="ac-tl">Ejecutivos con actividad</span></div>
-    <table><thead><tr><th>Ejecutivo</th><th>Oficina</th><th>Actividad este mes</th><th>Última actividad</th><th>Tipo</th><th>Score</th><th>Notas</th><th>Estado</th><th></th></tr></thead><tbody id="ac-tbody"></tbody></table>
+    <table><thead><tr><th>Ejecutivo</th><th>Oficina</th><th>Actividad este mes</th><th>Última actividad</th><th>Tipo</th><th>Score</th><th>Evaluador</th><th>Notas</th><th>Estado</th><th></th></tr></thead><tbody id="ac-tbody"></tbody></table>
   </div>
   <div id="ac-historial-wrap" style="display:none;margin-top:20px;">
     <div style="font-size:14px;font-weight:600;margin-bottom:12px;" id="ac-hist-title">Historial</div>
@@ -489,10 +489,10 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFAF8;}
     </div>
 
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:14px;margin-bottom:16px;">
-      <div class="tw"><div class="th2"><span class="tt">🟢 Top 10 — Mejor desempeño</span></div>
+      <div class="tw"><div class="th2"><span class="tt">🟢 Top 10 — Mejor desempeño <span style="font-size:10px;color:var(--t3);font-weight:400;">(última evaluación)</span></span></div>
         <div style="overflow-x:auto;"><table><thead><tr><th>#</th><th>Ejecutivo</th><th>Oficina</th><th style="text-align:right;">Score</th><th></th></tr></thead><tbody id="es-top"></tbody></table></div>
       </div>
-      <div class="tw"><div class="th2"><span class="tt">🔴 Bottom 10 — Requieren atención</span></div>
+      <div class="tw"><div class="th2"><span class="tt">🔴 Bottom 10 — Requieren atención <span style="font-size:10px;color:var(--t3);font-weight:400;">(última evaluación)</span></span></div>
         <div style="overflow-x:auto;"><table><thead><tr><th>#</th><th>Ejecutivo</th><th>Oficina</th><th style="text-align:right;">Score</th><th></th></tr></thead><tbody id="es-bottom"></tbody></table></div>
       </div>
     </div>
@@ -1233,14 +1233,14 @@ async function sbInit(){
     if(ofs&&ofs.length)DB.oficinas=ofs.map(o=>({id:o.id,nombre:o.nombre}));
     const {data:ejs}=await SB.from('ejecutivos').select('id,nombre,oficina_id,fase').eq('activo',true).order('nombre');
     if(ejs&&ejs.length)DB.ejecutivos=ejs.map(e=>({id:e.id,nombre:e.nombre,oficina:e.oficina_id,fase:e.fase||''}));
-    const {data:evs}=await SB.from('evaluaciones').select('id,ejecutivo_id,mes,score,scores_criterios,notas,guardada,detalle_checks,bancos_sel,evaluador');
+    const {data:evs}=await SB.from('evaluaciones').select('*');
     if(evs&&evs.length){
-      DB.evaluaciones=evs.map(ev=>({id:ev.id,sb_id:ev.id,ejecutivo:ev.ejecutivo_id,mes:ev.mes,score:ev.score,criterios:ev.scores_criterios,notas:ev.notas||'',guardada:ev.guardada,evaluador:ev.evaluador||'',detalle:ev.detalle_checks||null,bancos:ev.bancos_sel||null,layout:ev.layout_id||null,layout_id:ev.layout_id||null,fecha:ev.fecha||null}));
+      DB.evaluaciones=evs.filter(ev=>!ev.erased).map(ev=>({id:ev.id,sb_id:ev.id,ejecutivo:ev.ejecutivo_id,mes:ev.mes,score:ev.score,criterios:ev.scores_criterios,notas:ev.notas||'',guardada:ev.guardada,evaluador:ev.evaluador||'',detalle:ev.detalle_checks||null,bancos:ev.bancos_sel||null,layout:ev.layout_id||null,layout_id:ev.layout_id||null,fecha:ev.fecha||null}));
     }else DB.evaluaciones=[];
     // MVP3: Load Ágil evaluations
     try{
       const {data:ags}=await SB.from('evaluaciones_agiles').select('*');
-      if(ags&&ags.length){DB.evaluacionesAgiles=ags.map(a=>({id:a.id,ejecutivo:a.ejecutivo_id,mes:a.mes,score:a.score,checks:a.checks||[],comentarios:a.comentarios||'',evaluador:a.evaluador||'',fecha:a.fecha,layout:a.layout_id||1,layout_id:a.layout_id||1}));}
+      if(ags&&ags.length){DB.evaluacionesAgiles=ags.filter(a=>!a.erased).map(a=>({id:a.id,ejecutivo:a.ejecutivo_id,mes:a.mes,score:a.score,checks:a.checks||[],comentarios:a.comentarios||'',evaluador:a.evaluador||'',fecha:a.fecha,layout:a.layout_id||1,layout_id:a.layout_id||1}));}
       else DB.evaluacionesAgiles=[];
     }catch(e){console.log('Tabla evaluaciones_agiles no disponible aún. Ejecuta el SQL de migración.');DB.evaluacionesAgiles=DB.evaluacionesAgiles||[];}
     // Cargar layouts y config publicados desde app_config
@@ -1958,11 +1958,11 @@ function acRender(){
   function getActividad(ejId){
     const sess=acomps.filter(a=>a.ejecutivo===ejId).map(a=>({
       tipo:'Acompañamiento',fecha:(a.fecha||'').split('T')[0],score:null,
-      notas:a.notas||a.compromiso_nuevo||'',obj:a
+      notas:a.notas||a.compromiso_nuevo||'',evaluador:a.registrado_por||'',obj:a
     }));
     const evs=evals.filter(e=>e.ejecutivo===ejId&&e.guardada).map(e=>({
       tipo:'Evaluación',fecha:(e.fecha||e.mes+'-28').split('T')[0],score:e.score,
-      notas:e.notas||'',obj:e
+      notas:e.notas||'',evaluador:e.evaluador||'',obj:e
     }));
     return sess.concat(evs).sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
   }
@@ -1992,41 +1992,86 @@ function acRender(){
     const scoreCell=(last&&last.score!==null&&last.score!==undefined)?'<span style="font-weight:600;color:'+sc(last.score)+';">'+last.score+'</span>':'<span style="color:var(--t3);">—</span>';
     // Notas (del último registro)
     const notasCell=last&&last.notas?'<span style="font-size:11px;color:var(--t2);">'+last.notas.substring(0,55)+(last.notas.length>55?'...':'')+'</span>':'<span style="color:var(--t3);">—</span>';
+    const evalCell=last&&last.evaluador?'<span style="font-size:11px;color:var(--t2);">'+last.evaluador+'</span>':'<span style="color:var(--t3);">—</span>';
 
-    h+='<tr><td style="font-weight:500">'+ej.nombre+'</td><td>'+gOf(ej.oficina).nombre+'</td><td style="font-size:13px;">'+enMes+'</td><td style="font-size:11px;color:var(--t2);">'+uf+'</td><td>'+tipoCell+'</td><td>'+scoreCell+'</td><td>'+notasCell+'</td><td>'+estado+'</td><td><button class="btn btn-sm" onclick="acVerHist(\''+ej.id+'\')">Ver historial</button></td></tr>';
+    h+='<tr><td style="font-weight:500">'+ej.nombre+'</td><td>'+gOf(ej.oficina).nombre+'</td><td style="font-size:13px;">'+enMes+'</td><td style="font-size:11px;color:var(--t2);">'+uf+'</td><td>'+tipoCell+'</td><td>'+scoreCell+'</td><td>'+evalCell+'</td><td>'+notasCell+'</td><td>'+estado+'</td><td><button class="btn btn-sm" onclick="acVerHist(\''+ej.id+'\')">Ver historial</button></td></tr>';
   });
-  document.getElementById('ac-tbody').innerHTML=h||'<tr><td colspan="9" class="empty">Sin resultados</td></tr>';
+  document.getElementById('ac-tbody').innerHTML=h||'<tr><td colspan="10" class="empty">Sin resultados</td></tr>';
 }
 function acVerHist(ejId){
   const ej=gEj(ejId);
-  const sess=(DB.acompañamientos||[]).filter(a=>a.ejecutivo===ejId).map(a=>({tipo:'sesion',fecha:a.fecha,obj:a}));
-  const evs=(DB.evaluaciones||[]).filter(e=>e.ejecutivo===ejId&&e.guardada).map(e=>({tipo:'eval',fecha:e.mes+'-28',obj:e}));
-  const hist=sess.concat(evs).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  const sess=(DB.acompañamientos||[]).filter(a=>a.ejecutivo===ejId).map(a=>({tipo:'sesion',fecha:(a.fecha||'').split('T')[0],obj:a}));
+  const evs=(DB.evaluaciones||[]).filter(e=>e.ejecutivo===ejId&&e.guardada).map(e=>({tipo:'eval',fecha:(e.fecha||e.mes+'-28').split('T')[0],obj:e}));
+  const hist=sess.concat(evs).sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
   document.getElementById('ac-hist-title').textContent='Historial — '+ej.nombre;
+  const isAdmin=SESSION?.rol==='super_admin';
   let h='';
   if(!hist.length){h='<div class="empty">Sin actividad registrada</div>';}
   else{hist.forEach(item=>{
     if(item.tipo==='sesion'){
       const a=item.obj;
       const c=a.cumplio_anterior===null?'':a.cumplio_anterior?'<span class="badge bg" style="font-size:10px;">Cumplió</span>':'<span class="badge br" style="font-size:10px;">No cumplió</span>';
-      h+='<div style="background:var(--surface);border:1px solid var(--bd);border-left:3px solid var(--acc);border-radius:var(--rs);padding:12px 14px;margin-bottom:8px;"><div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;"><span style="font-size:10px;font-weight:600;color:var(--acc);text-transform:uppercase;">📋 Sesión</span><span style="font-size:12px;font-weight:500;">'+a.fecha+'</span>'+c+'<span style="font-size:11px;color:var(--t3);margin-left:auto;">'+a.registrado_por+'</span></div>'+(a.compromiso_anterior?'<div style="font-size:11px;color:var(--t3);margin-bottom:4px;">Compromiso anterior: '+a.compromiso_anterior+'</div>':'')+'<div style="font-size:13px;"><b style="font-weight:500;font-size:11px;color:var(--t2);">Compromiso: </b>'+a.compromiso_nuevo+'</div>'+(a.notas?'<div style="font-size:11px;color:var(--t3);margin-top:4px;">'+a.notas+'</div>':'')+'</div>';
+      const delBtn=isAdmin?'<button class="btn btn-sm btn-danger" style="margin-left:8px;font-size:10px;padding:3px 8px;" onclick="acBorrarRegistro(\'sesion\',\''+a.id+'\',\''+ejId+'\')">Borrar</button>':'';
+      h+='<div style="background:var(--surface);border:1px solid var(--bd);border-left:3px solid var(--acc);border-radius:var(--rs);padding:12px 14px;margin-bottom:8px;"><div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;"><span style="font-size:10px;font-weight:600;color:var(--acc);text-transform:uppercase;">📋 Acompañamiento</span><span style="font-size:12px;font-weight:500;">'+a.fecha+'</span>'+c+'<span style="font-size:11px;color:var(--t3);margin-left:auto;">Evaluador: <b>'+(a.registrado_por||'—')+'</b></span>'+delBtn+'</div>'+(a.compromiso_anterior?'<div style="font-size:11px;color:var(--t3);margin-bottom:4px;">Compromiso anterior: '+a.compromiso_anterior+'</div>':'')+'<div style="font-size:13px;"><b style="font-weight:500;font-size:11px;color:var(--t2);">Compromiso: </b>'+a.compromiso_nuevo+'</div>'+(a.notas?'<div style="font-size:11px;color:var(--t3);margin-top:4px;">'+a.notas+'</div>':'')+'</div>';
     }else{
       const e=item.obj;
       const lyt=e.layout||e.layout_id;
       const lytLbl=lyt?'Opción '+lyt:'(histórica)';
-      h+='<div style="background:var(--surface);border:1px solid var(--bd);border-left:3px solid '+sc(e.score)+';border-radius:var(--rs);padding:12px 14px;margin-bottom:8px;"><div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;"><span style="font-size:10px;font-weight:600;color:'+sc(e.score)+';text-transform:uppercase;">📊 Evaluación</span><span style="font-size:12px;font-weight:500;">'+mL(e.mes)+'</span><span style="font-size:11px;color:var(--t3);">'+lytLbl+'</span><span style="font-size:13px;font-weight:600;color:'+sc(e.score)+';margin-left:auto;">'+e.score+'/100</span></div>'+(e.notas?'<div style="font-size:12px;color:var(--t);">'+e.notas+'</div>':'<div style="font-size:11px;color:var(--t3);font-style:italic;">Sin notas</div>')+'<div style="font-size:10px;color:var(--t3);margin-top:6px;">'+e.evaluador+'</div></div>';
+      const delBtn=isAdmin?'<button class="btn btn-sm btn-danger" style="margin-left:8px;font-size:10px;padding:3px 8px;" onclick="acBorrarRegistro(\'eval\',\''+(e.sb_id||e.id)+'\',\''+ejId+'\')">Borrar</button>':'';
+      // Detalle por rubro
+      let detalleHtml='';
+      if(e.detalle&&Array.isArray(e.detalle)&&lyt){
+        const config=getEvalConfig(lyt);
+        const porCrit={};
+        config.forEach((p,i)=>{
+          if(!porCrit[p.criterio_idx])porCrit[p.criterio_idx]={ok:[],fail:[],got:0,max:0};
+          porCrit[p.criterio_idx].max+=p.pts;
+          if(e.detalle[i]){porCrit[p.criterio_idx].ok.push(p.texto);porCrit[p.criterio_idx].got+=p.pts;}
+          else porCrit[p.criterio_idx].fail.push(p.texto);
+        });
+        detalleHtml='<div style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--bd);"><div style="font-size:10px;font-weight:600;color:var(--t2);text-transform:uppercase;margin-bottom:8px;">Detalle por rubro</div>';
+        DB.criterios.forEach((c,ci)=>{
+          const pc=porCrit[ci];if(!pc)return;
+          const pct=pc.max?Math.round((pc.got/pc.max)*100):0;
+          detalleHtml+='<div style="margin-bottom:10px;padding:8px;background:var(--bg);border-radius:4px;">';
+          detalleHtml+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;"><span style="font-size:12px;font-weight:600;flex:1;">'+c.nombre+'</span><span style="font-size:11px;color:'+sc(pct)+';font-weight:600;">'+pc.got+'/'+pc.max+' ('+pct+'%)</span></div>';
+          if(pc.ok.length){detalleHtml+='<div style="font-size:10px;color:var(--gn);margin-bottom:3px;"><b>✓ Contestó bien ('+pc.ok.length+'):</b></div>';pc.ok.forEach(t=>{detalleHtml+='<div style="font-size:11px;color:var(--t2);padding-left:14px;margin-bottom:2px;">• '+t+'</div>';});}
+          if(pc.fail.length){detalleHtml+='<div style="font-size:10px;color:var(--rd);margin-top:4px;margin-bottom:3px;"><b>✗ No contestó / mal ('+pc.fail.length+'):</b></div>';pc.fail.forEach(t=>{detalleHtml+='<div style="font-size:11px;color:var(--t2);padding-left:14px;margin-bottom:2px;">• '+t+'</div>';});}
+          detalleHtml+='</div>';
+        });
+        detalleHtml+='</div>';
+      }
+      h+='<div style="background:var(--surface);border:1px solid var(--bd);border-left:3px solid '+sc(e.score)+';border-radius:var(--rs);padding:12px 14px;margin-bottom:8px;"><div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;"><span style="font-size:10px;font-weight:600;color:'+sc(e.score)+';text-transform:uppercase;">📊 Evaluación</span><span style="font-size:12px;font-weight:500;">'+(e.fecha?e.fecha.split('T')[0]:mL(e.mes))+'</span><span style="font-size:11px;color:var(--t3);">'+lytLbl+'</span><span style="font-size:13px;font-weight:600;color:'+sc(e.score)+';margin-left:auto;">'+e.score+'/100</span><span style="font-size:11px;color:var(--t3);">Evaluador: <b>'+(e.evaluador||'—')+'</b></span>'+delBtn+'</div>'+(e.notas?'<div style="font-size:12px;color:var(--t);">'+e.notas+'</div>':'<div style="font-size:11px;color:var(--t3);font-style:italic;">Sin notas</div>')+detalleHtml+'</div>';
     }
   });}
   document.getElementById('ac-hist-list').innerHTML=h;
   document.getElementById('ac-historial-wrap').style.display='block';
   document.getElementById('ac-historial-wrap').scrollIntoView({behavior:'smooth'});
 }
+
+async function acBorrarRegistro(tipo,id,ejId){
+  if(SESSION?.rol!=='super_admin'){alert('Solo administradores pueden borrar registros.');return;}
+  if(!confirm('¿Borrar este registro? Quedará marcado como "erased" en la BD. Esta acción no se puede deshacer desde la UI.'))return;
+  try{
+    if(tipo==='eval'){
+      if(USE_SUPABASE&&SB){const {error}=await SB.from('evaluaciones').update({erased:true}).eq('id',id);if(error)throw error;}
+      DB.evaluaciones=DB.evaluaciones.filter(e=>e.id!==id&&e.sb_id!==id);
+    }else{
+      if(USE_SUPABASE&&SB){const {error}=await SB.from('acompañamientos').update({erased:true}).eq('id',id);if(error)throw error;}
+      DB.acompañamientos=(DB.acompañamientos||[]).filter(a=>a.id!==id);
+    }
+    save();
+    acRender();acVerHist(ejId);
+    if(typeof rD==='function')rD();
+    if(document.getElementById('vw-estrategico')&&document.getElementById('vw-estrategico').classList.contains('active'))initEstrategico();
+  }catch(e){alert('Error al borrar: '+e.message);}
+}
 function acCloseHist(){document.getElementById('ac-historial-wrap').style.display='none';}
 async function acLoadFromSB(){
   if(!SB)return;
   try{
-    const {data}=await SB.from('acompañamientos').select('id,ejecutivo_id,fecha,cumplio_anterior,compromiso_anterior,compromiso_nuevo,notas,registrado_por').order('fecha',{ascending:false});
-    if(data&&data.length){DB.acompañamientos=data.map(a=>({id:a.id,ejecutivo:a.ejecutivo_id,fecha:a.fecha,cumplio_anterior:a.cumplio_anterior,compromiso_anterior:a.compromiso_anterior,compromiso_nuevo:a.compromiso_nuevo,notas:a.notas||'',registrado_por:a.registrado_por||''}));save();}
+    const {data}=await SB.from('acompañamientos').select('*').order('fecha',{ascending:false});
+    if(data&&data.length){DB.acompañamientos=data.filter(a=>!a.erased).map(a=>({id:a.id,ejecutivo:a.ejecutivo_id,fecha:a.fecha,cumplio_anterior:a.cumplio_anterior,compromiso_anterior:a.compromiso_anterior,compromiso_nuevo:a.compromiso_nuevo,notas:a.notas||'',registrado_por:a.registrado_por||''}));save();}
   }catch(e){console.error('AC load:',e);}
 }
 
@@ -2512,8 +2557,13 @@ function rEstrategico(){
     '<div class="sc r"><div class="sv">'+pctAt+'%</div><div class="sl">Atención (<60)</div><div style="font-size:10px;color:var(--t3);margin-top:3px;">'+at+' ejecutivos</div></div>'+
     '<div class="sc'+(delta>=0?' g':' r')+'"><div class="sv">'+(delta>=0?'+':'')+delta+'</div><div class="sl">Δ vs '+mL(mesPrev)+'</div></div>'+
     '<div class="sc a"><div class="sv" style="font-size:14px;line-height:1.3;">'+critDebil.avg+'%</div><div class="sl" style="font-size:10px;">Criterio más débil</div><div style="font-size:10px;color:var(--t3);margin-top:3px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+critDebil.nombre+'</div></div>';
-  // Ranking: promedio por ejecutivo en el periodo
-  const rankItems=Object.entries(promPorEj).map(([id,arr])=>({ejecutivo:id,score:Math.round(arr.reduce((s,v)=>s+v,0)/arr.length)})).sort((a,b)=>b.score-a.score);
+  // Ranking: ÚLTIMA evaluación de cada ejecutivo en el periodo (más reciente por fecha)
+  const ultPorEj={};
+  evs.forEach(e=>{
+    const cur=ultPorEj[e.ejecutivo];
+    if(!cur||(e.fecha||'').localeCompare(cur.fecha||'')>0)ultPorEj[e.ejecutivo]=e;
+  });
+  const rankItems=Object.values(ultPorEj).map(e=>({ejecutivo:e.ejecutivo,score:e.score,fecha:e.fecha,mes:e.mes})).sort((a,b)=>b.score-a.score);
   const top=rankItems.slice(0,10),bot=rankItems.slice(-10).reverse();
   const prevMap={};evsPrev.forEach(e=>{prevMap[e.ejecutivo]=e.score;});
   function rowHtml(item,idx){
