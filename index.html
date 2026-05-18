@@ -478,7 +478,7 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFAF8;}
     <button class="chip" id="ac-chip-ok" onclick="acChip('ok')">Al día</button>
   </div>
   <div class="tw">
-    <div class="th2"><span class="tt" id="ac-tl">Ejecutivos con actividad</span></div>
+    <div class="th2" style="display:flex;align-items:center;justify-content:space-between;"><span class="tt" id="ac-tl">Ejecutivos con actividad</span><button class="btn btn-sm" onclick="exportActividad()" style="background:var(--am2);color:var(--am);border:1px solid var(--am);">⬇ Exportar Actividad</button></div>
     <table><thead><tr><th>Ejecutivo</th><th>Oficina</th><th>Actividad este mes</th><th>Última actividad</th><th>Tipo</th><th>Score</th><th>Evaluador</th><th>Notas</th><th>Estado</th><th></th></tr></thead><tbody id="ac-tbody"></tbody></table>
   </div>
   <div id="ac-historial-wrap" style="display:none;margin-top:20px;">
@@ -2207,6 +2207,68 @@ function acVerHist(ejId){
   document.getElementById('ac-historial-wrap').scrollIntoView({behavior:'smooth'});
 }
 
+function exportActividad(){
+  try{
+    if(typeof XLSX==='undefined'){alert('SheetJS no disponible');return;}
+    const wb=XLSX.utils.book_new();
+
+    // Hoja 1: Resumen — vista actual de Ejecutivos con actividad
+    const hdrRes=['Ejecutivo','Oficina','Fase','Total actividades','Evaluaciones','Acompañamientos','Última actividad','Tipo última','Último Score','Última Eval - Mes','Última Eval - Layout','Última Eval - Evaluador','Última Eval - Notas'];
+    const rowsRes=[hdrRes];
+    DB.ejecutivos.forEach(ej=>{
+      const of=gOf(ej.oficina);
+      const acomps=(DB.acompañamientos||[]).filter(a=>a.ejecutivo===ej.id).map(a=>({tipo:'Acompañamiento',fecha:(a.fecha||'').split('T')[0],obj:a}));
+      const evs=(DB.evaluaciones||[]).filter(e=>e.ejecutivo===ej.id&&e.guardada).map(e=>({tipo:'Evaluación',fecha:(e.fecha||e.mes+'-28').split('T')[0],obj:e}));
+      const all=acomps.concat(evs).sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
+      const last=all[0];
+      const lastEval=all.find(a=>a.tipo==='Evaluación');
+      rowsRes.push([
+        ej.nombre,of.nombre,ej.fase||'',all.length,evs.length,acomps.length,
+        last?last.fecha:'',last?last.tipo:'',
+        lastEval?lastEval.obj.score:'',
+        lastEval?mL(lastEval.obj.mes):'',
+        lastEval&&(lastEval.obj.layout||lastEval.obj.layout_id)?'Opción '+(lastEval.obj.layout||lastEval.obj.layout_id):'',
+        lastEval?lastEval.obj.evaluador||'':'',
+        lastEval?lastEval.obj.notas||'':''
+      ]);
+    });
+    const wsRes=XLSX.utils.aoa_to_sheet(rowsRes);
+    wsRes['!cols']=[{wch:28},{wch:22},{wch:12},{wch:10},{wch:10},{wch:14},{wch:12},{wch:14},{wch:8},{wch:12},{wch:14},{wch:16},{wch:30}];
+    XLSX.utils.book_append_sheet(wb,'Resumen',wsRes);
+
+    // Hoja 2: Historial completo con desglose por rubros
+    const hdrHist=['Ejecutivo','Oficina','Fecha','Tipo','Mes','Layout','Score',...DB.criterios.map(c=>c.nombre),'Compromiso','Cumplió anterior','Evaluador','Notas'];
+    const rowsHist=[hdrHist];
+    DB.ejecutivos.forEach(ej=>{
+      const of=gOf(ej.oficina);
+      const acomps=(DB.acompañamientos||[]).filter(a=>a.ejecutivo===ej.id);
+      const evs=(DB.evaluaciones||[]).filter(e=>e.ejecutivo===ej.id&&e.guardada);
+      const all=[];
+      acomps.forEach(a=>all.push({fecha:(a.fecha||'').split('T')[0],tipo:'Acompañamiento',obj:a}));
+      evs.forEach(e=>all.push({fecha:(e.fecha||e.mes+'-28').split('T')[0],tipo:'Evaluación',obj:e}));
+      all.sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
+      all.forEach(item=>{
+        if(item.tipo==='Evaluación'){
+          const e=item.obj;
+          const cS=DB.criterios.map((_,ci)=>e.criterios?e.criterios[ci]:'');
+          const lyt=e.layout||e.layout_id;
+          rowsHist.push([ej.nombre,of.nombre,item.fecha,'Evaluación',mL(e.mes),lyt?'Opción '+lyt:'',e.score,...cS,'','',e.evaluador||'',e.notas||'']);
+        }else{
+          const a=item.obj;
+          rowsHist.push([ej.nombre,of.nombre,item.fecha,'Acompañamiento','','','',...DB.criterios.map(()=>''),a.compromiso_nuevo||'',a.cumplio_anterior===null?'':a.cumplio_anterior?'Sí':'No',a.registrado_por||'',a.notas||'']);
+        }
+      });
+    });
+    const wsHist=XLSX.utils.aoa_to_sheet(rowsHist);
+    wsHist['!cols']=[{wch:28},{wch:22},{wch:12},{wch:14},{wch:10},{wch:12},{wch:8},...DB.criterios.map(()=>({wch:14})),{wch:40},{wch:14},{wch:16},{wch:30}];
+    XLSX.utils.book_append_sheet(wb,'Historial completo',wsHist);
+
+    const wbout=XLSX.write(wb,{bookType:'xlsx',type:'array',compression:true});
+    const fn='Actividad_Ejecutivos_'+new Date().toISOString().split('T')[0]+'.xlsx';
+    descargarArchivo(new Uint8Array(wbout),fn,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  }catch(e){console.error('exportActividad:',e);alert('Error al exportar: '+e.message);}
+}
+
 async function acBorrarRegistro(tipo,id,ejId){
   if(SESSION?.rol!=='super_admin'){alert('Solo administradores pueden borrar registros.');return;}
   if(!confirm('¿Borrar este registro? Quedará marcado como "erased" en la BD. Esta acción no se puede deshacer desde la UI.'))return;
@@ -2740,7 +2802,7 @@ function renderHeatmap(ejs,evs){
   const oficinasIds=Object.keys(oficinasUsadas);
   if(!oficinasIds.length){document.getElementById('es-heatmap').innerHTML='<div class="empty">Sin oficinas para mostrar</div>';return;}
   let h='<table style="border-collapse:collapse;font-size:11px;width:100%;min-width:600px;"><thead><tr><th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--bd);font-size:10px;color:var(--t3);">Oficina</th>';
-  DB.criterios.forEach(c=>{h+='<th style="text-align:center;padding:6px 8px;border-bottom:1px solid var(--bd);font-size:10px;color:var(--t3);max-width:90px;">'+c.nombre.split(' ').slice(0,2).join(' ')+'</th>';});
+  DB.criterios.forEach(c=>{h+='<th style="text-align:center;padding:6px 8px;border-bottom:1px solid var(--bd);font-size:10px;color:var(--t3);min-width:110px;white-space:normal;line-height:1.2;">'+c.nombre+'</th>';});
   h+='<th style="text-align:center;padding:6px 8px;border-bottom:1px solid var(--bd);font-size:10px;color:var(--t3);">Prom.</th></tr></thead><tbody>';
   oficinasIds.forEach(oid=>{
     const of=gOf(oid);
@@ -2829,24 +2891,34 @@ function rEvoChart(){
 }
 
 function exportEstrategico(){
-  const ejs=ejecutivosFiltrados();const ejIds=new Set(ejs.map(e=>e.id));
-  const mesesFiltro=MS_STATE.mes;
-  let evs=DB.evaluaciones.filter(e=>e.guardada&&e.score!==null&&ejIds.has(e.ejecutivo));
-  if(mesesFiltro.length)evs=evs.filter(e=>mesesFiltro.includes(e.mes));
-  evs.sort((a,b)=>a.mes.localeCompare(b.mes));
-  if(typeof XLSX==='undefined'){alert('SheetJS no disponible');return;}
-  const rows=[['Mes','Ejecutivo','Oficina','Fase','Score',...DB.criterios.map(c=>c.nombre),'Evaluador','Notas']];
-  evs.forEach(ev=>{
-    const ej=gEj(ev.ejecutivo);const of=gOf(ej.oficina);
-    const cS=DB.criterios.map((_,ci)=>ev.criterios?ev.criterios[ci]:'');
-    rows.push([mL(ev.mes),ej.nombre,of.nombre,ej.fase||'',ev.score,...cS,ev.evaluador||'',ev.notas||'']);
-  });
-  const ws=XLSX.utils.aoa_to_sheet(rows);
-  ws['!cols']=[{wch:10},{wch:28},{wch:22},{wch:12},{wch:8},...DB.criterios.map(()=>({wch:14})),{wch:16},{wch:30}];
-  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,'Estratégico',ws);
-  const wbout=XLSX.write(wb,{bookType:'xlsx',type:'array',compression:true});
-  const blob=new Blob([new Uint8Array(wbout)],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
-  const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='Estrategico_'+new Date().toISOString().split('T')[0]+'.xlsx';document.body.appendChild(a);a.click();setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url);},200);
+  try{
+    const ejs=typeof ejecutivosFiltrados==='function'?ejecutivosFiltrados():DB.ejecutivos;
+    const ejIds=new Set(ejs.map(e=>e.id));
+    const mesesFiltro=(typeof MS_STATE!=='undefined'&&MS_STATE&&MS_STATE.mes)?MS_STATE.mes:[];
+    let evs=DB.evaluaciones.filter(e=>e.guardada&&e.score!==null&&ejIds.has(e.ejecutivo));
+    if(mesesFiltro.length)evs=evs.filter(e=>mesesFiltro.includes(e.mes));
+    if(!evs.length){alert('No hay evaluaciones para exportar con los filtros actuales');return;}
+    evs.sort((a,b)=>a.mes.localeCompare(b.mes));
+    const rows=[['Mes','Ejecutivo','Oficina','Fase','Layout','Score',...DB.criterios.map(c=>c.nombre),'Evaluador','Notas','Fecha']];
+    evs.forEach(ev=>{
+      const ej=gEj(ev.ejecutivo);const of=gOf(ej.oficina);
+      const cS=DB.criterios.map((_,ci)=>ev.criterios?ev.criterios[ci]:'');
+      const lyt=ev.layout||ev.layout_id;
+      rows.push([mL(ev.mes),ej.nombre,of.nombre,ej.fase||'',lyt?'Opción '+lyt:'',ev.score,...cS,ev.evaluador||'',ev.notas||'',(ev.fecha||'').split('T')[0]]);
+    });
+    if(typeof XLSX!=='undefined'){
+      const ws=XLSX.utils.aoa_to_sheet(rows);
+      ws['!cols']=[{wch:10},{wch:28},{wch:22},{wch:12},{wch:12},{wch:8},...DB.criterios.map(()=>({wch:14})),{wch:16},{wch:30},{wch:12}];
+      const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,'Estratégico',ws);
+      const wbout=XLSX.write(wb,{bookType:'xlsx',type:'array',compression:true});
+      const fn='Estrategico_'+new Date().toISOString().split('T')[0]+'.xlsx';
+      const ok=descargarArchivo(new Uint8Array(wbout),fn,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      if(ok)return;
+    }
+    // Fallback CSV
+    const csv=rows.map(r=>r.map(v=>'"'+String(v||'').replace(/"/g,'""')+'"').join(',')).join('\n');
+    descargarArchivo(csv,'Estrategico_'+new Date().toISOString().split('T')[0]+'.csv','text/csv;charset=utf-8;');
+  }catch(e){console.error('exportEstrategico:',e);alert('Error al exportar: '+e.message);}
 }
 
 function populateComparativoSelects(){
