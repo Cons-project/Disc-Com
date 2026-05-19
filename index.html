@@ -1345,7 +1345,12 @@ async function sbSaveEval(obj){
 }
 
 async function sbSaveOficina(id,nombre){if(!SB)return;await SB.from('oficinas').update({nombre}).eq('id',id);}
-async function sbSaveEjecutivo(id,nombre,oficina_id,fase=''){if(!SB)return;await SB.from('ejecutivos').update({nombre,oficina_id,fase}).eq('id',id);}
+async function sbSaveEjecutivo(id,nombre,oficina_id,fase=''){
+  if(!SB)return;
+  const ej=DB.ejecutivos.find(e=>e.id===id);
+  const resp=ej?ej.responsable_seguimiento||'':'';
+  await SB.from('ejecutivos').update({nombre,oficina_id,fase,responsable_seguimiento:resp}).eq('id',id);
+}
 async function sbAddOficina(nombre){if(!SB)return null;const {data,error}=await SB.from('oficinas').insert({nombre}).select('id').single();if(error)return null;return data.id;}
 async function sbAddEjecutivo(nombre,oficina_id,fase=''){if(!SB)return null;const {data,error}=await SB.from('ejecutivos').insert({nombre,oficina_id,fase}).select('id').single();if(error)return null;return data.id;}
 
@@ -2953,7 +2958,15 @@ function exportEstrategico(){
       rows.push([cell(mL(ev.mes)),cell(ej.nombre),cell(of.nombre),cell(ej.fase),cell(ej.responsable_seguimiento),cell(lyt?'Opción '+lyt:''),typeof ev.score==='number'?ev.score:'',...cS,cell(ev.evaluador),cell(ev.notas),cell((ev.fecha||'').split('T')[0])]);
     });
     if(typeof XLSX!=='undefined'){
-      const ws=XLSX.utils.aoa_to_sheet(rows);
+      // Sanitizar TODAS las celdas antes de pasar a XLSX
+      const safeRows=rows.map(row=>row.map(v=>{
+        if(v===null||v===undefined)return '';
+        if(typeof v==='number'&&isFinite(v))return v;
+        if(typeof v==='boolean')return v?'Sí':'No';
+        if(typeof v==='object')return '';
+        return String(v);
+      }));
+      const ws=XLSX.utils.aoa_to_sheet(safeRows);
       ws['!cols']=[{wch:10},{wch:28},{wch:22},{wch:12},{wch:12},{wch:8},...DB.criterios.map(()=>({wch:14})),{wch:16},{wch:30},{wch:12}];
       const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,'Estratégico',ws);
       const wbout=XLSX.write(wb,{bookType:'xlsx',type:'array',compression:true});
