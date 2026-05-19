@@ -511,6 +511,8 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFAF8;}
         <div class="ms-wrap" id="ms-ejecutivo"></div></div>
       <div><label style="font-size:11px;color:var(--t2);display:block;margin-bottom:5px;">Fase</label>
         <div class="ms-wrap" id="ms-fase"></div></div>
+      <div><label style="font-size:11px;color:var(--t2);display:block;margin-bottom:5px;">Responsable</label>
+        <div class="ms-wrap" id="ms-responsable"></div></div>
       <div style="margin-left:auto;display:flex;gap:6px;">
         <button class="btn-tool" onclick="clearEsFilters()">🗑 Limpiar</button>
         <button class="btn-tool" onclick="exportEstrategico()">⬇ Exportar BD filtrada</button>
@@ -2623,8 +2625,8 @@ function mesesDelAno(){
   return out;
 }
 
-const MS_STATE={mes:[],oficina:[],ejecutivo:[],fase:[]};
-let ES_OPTIONS={mes:[],oficina:[],ejecutivo:[],fase:[]};
+const MS_STATE={mes:[],oficina:[],ejecutivo:[],fase:[],responsable:[]};
+let ES_OPTIONS={mes:[],oficina:[],ejecutivo:[],fase:[],responsable:[]};
 
 function buildMS(id,options){
   const wrap=document.getElementById('ms-'+id);if(!wrap)return;
@@ -2675,6 +2677,7 @@ function rebuildMS(){
   buildMS('oficina',ES_OPTIONS.oficina);
   buildMS('ejecutivo',ES_OPTIONS.ejecutivo);
   buildMS('fase',ES_OPTIONS.fase);
+  buildMS('responsable',ES_OPTIONS.responsable);
   renderChips();
 }
 function renderChips(){
@@ -2691,7 +2694,7 @@ function renderChips(){
 function removeChip(k,v){const arr=MS_STATE[k];const i=arr.indexOf(v);if(i>=0)arr.splice(i,1);rebuildMS();onEsFilterChange(k);}
 
 function onEsFilterChange(changedKey){
-  if(changedKey==='oficina'||changedKey==='fase'){
+  if(changedKey==='oficina'||changedKey==='fase'||changedKey==='responsable'){
     updateEjecutivoOptions();rebuildMS();
   }
   rEstrategico();rEvoChart();
@@ -2715,11 +2718,12 @@ function ejecutivosBaseDeFiltros(){
 function ejecutivosFiltrados(){
   let lista=ejecutivosBaseDeFiltros();
   if(MS_STATE.ejecutivo.length)lista=lista.filter(e=>MS_STATE.ejecutivo.includes(e.id));
+  if(MS_STATE.responsable.length)lista=lista.filter(e=>MS_STATE.responsable.includes(e.responsable_seguimiento||''));
   return lista;
 }
 
 function clearEsFilters(){
-  MS_STATE.mes=[];MS_STATE.oficina=[];MS_STATE.ejecutivo=[];MS_STATE.fase=[];
+  MS_STATE.mes=[];MS_STATE.oficina=[];MS_STATE.ejecutivo=[];MS_STATE.fase=[];MS_STATE.responsable=[];
   updateEjecutivoOptions();rebuildMS();rEstrategico();rEvoChart();
   if(document.getElementById('subview-comparativo').classList.contains('active'))rComparativo();
 }
@@ -2735,6 +2739,8 @@ function initEstrategico(){
   ES_OPTIONS.oficina=DB.oficinas.slice().sort((a,b)=>a.nombre.localeCompare(b.nombre)).map(o=>({value:o.id,label:o.nombre}));
   const fases=[...new Set(DB.ejecutivos.map(e=>e.fase).filter(Boolean))].sort();
   ES_OPTIONS.fase=fases.length?fases.map(f=>({value:f,label:f})):[];
+  const resps=[...new Set(DB.ejecutivos.map(e=>e.responsable_seguimiento).filter(Boolean))].sort();
+  ES_OPTIONS.responsable=resps.map(r=>({value:r,label:r}));
   updateEjecutivoOptions();
   rebuildMS();
   const hcS=document.getElementById('hc-ejecutivo');
@@ -2938,13 +2944,13 @@ function exportEstrategico(){
     if(mesesFiltro.length)evs=evs.filter(e=>mesesFiltro.includes(e.mes));
     if(!evs.length){alert('No hay evaluaciones para exportar con los filtros actuales');return;}
     evs.sort((a,b)=>a.mes.localeCompare(b.mes));
-    const rows=[['Mes','Ejecutivo','Oficina','Fase','Layout','Score',...DB.criterios.map(c=>c.nombre),'Evaluador','Notas','Fecha']];
-    const cell=v=>(v===null||v===undefined)?'':typeof v==='object'?'':v;
+    const rows=[['Mes','Ejecutivo','Oficina','Fase','Responsable Seguimiento','Layout','Score',...DB.criterios.map(c=>c.nombre),'Evaluador','Notas','Fecha']];
+    const cell=v=>{if(v===null||v===undefined)return '';if(typeof v==='object')return '';const s=String(v);return s;};
     evs.forEach(ev=>{
       const ej=gEj(ev.ejecutivo);const of=gOf(ej.oficina);
-      const cS=DB.criterios.map((_,ci)=>ev.criterios&&ev.criterios[ci]!==undefined&&ev.criterios[ci]!==null?ev.criterios[ci]:'');
+      const cS=DB.criterios.map((_,ci)=>{const val=ev.criterios&&ev.criterios[ci]!==undefined&&ev.criterios[ci]!==null?ev.criterios[ci]:'';return typeof val==='number'?val:cell(val);});
       const lyt=ev.layout||ev.layout_id;
-      rows.push([cell(mL(ev.mes)),cell(ej.nombre),cell(of.nombre),cell(ej.fase),cell(lyt?'Opción '+lyt:''),ev.score!==null&&ev.score!==undefined?ev.score:'',...cS,cell(ev.evaluador),cell(ev.notas),cell((ev.fecha||'').split('T')[0])]);
+      rows.push([cell(mL(ev.mes)),cell(ej.nombre),cell(of.nombre),cell(ej.fase),cell(ej.responsable_seguimiento),cell(lyt?'Opción '+lyt:''),typeof ev.score==='number'?ev.score:'',...cS,cell(ev.evaluador),cell(ev.notas),cell((ev.fecha||'').split('T')[0])]);
     });
     if(typeof XLSX!=='undefined'){
       const ws=XLSX.utils.aoa_to_sheet(rows);
