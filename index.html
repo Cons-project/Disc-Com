@@ -290,7 +290,7 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFAF8;}
 <nav class="nav">
   <div class="nb">Disciplina <span>Comercial</span></div>
   <div class="nt">
-    <button class="ntb active" id="nb-dashboard" onclick="sv('dashboard')">Dashboard</button>
+    <button class="ntb active" id="nb-dashboard" onclick="sv('dashboard')">🏠 Home</button>
     <button class="ntb" id="nb-evaluar" onclick="sv('evaluar')">Evaluar</button>
     <button class="ntb" id="nb-evolución" onclick="sv('evolución')">Evolución</button>
     <button class="ntb" id="nb-oficinas" onclick="sv('oficinas')">Por oficina</button>
@@ -1277,7 +1277,7 @@ async function sbInit(){
     const {data:ofs}=await SB.from('oficinas').select('id,nombre').order('nombre');
     if(ofs&&ofs.length)DB.oficinas=ofs.map(o=>({id:o.id,nombre:o.nombre}));
     const {data:ejs}=await SB.from('ejecutivos').select('id,nombre,oficina_id,fase').eq('activo',true).order('nombre');
-    if(ejs&&ejs.length)DB.ejecutivos=ejs.map(e=>({id:e.id,nombre:e.nombre,oficina:e.oficina_id,fase:e.fase||''}));
+    if(ejs&&ejs.length)DB.ejecutivos=ejs.map(e=>({id:e.id,nombre:e.nombre,oficina:e.oficina_id,fase:e.fase||'',responsable_seguimiento:e.responsable_seguimiento||''}));
     const {data:evs}=await SB.from('evaluaciones').select('*');
     if(evs&&evs.length){
       DB.evaluaciones=evs.filter(ev=>!ev.erased).map(ev=>({id:ev.id,sb_id:ev.id,ejecutivo:ev.ejecutivo_id,mes:ev.mes,score:ev.score,criterios:ev.scores_criterios,notas:ev.notas||'',guardada:ev.guardada,evaluador:ev.evaluador||'',detalle:ev.detalle_checks||null,bancos:ev.bancos_sel||null,layout:ev.layout_id||null,layout_id:ev.layout_id||null,fecha:ev.fecha||null}));
@@ -1878,7 +1878,7 @@ function rAdmin(){
     oh+='<div class="ai"><input class="ed" value="'+o.nombre+'" onblur="uOf(\''+o.id+'\',this.value)"><span style="font-size:12px;color:var(--t2);">'+ejecs+' ejecutivos</span><button class="btn btn-sm btn-danger" onclick="dOf(\''+o.id+'\')" '+(ejecs>0?'disabled title="No se puede eliminar: tiene ejecutivos"':'')+'>Eliminar</button></div>';
   });
   document.getElementById('adof').innerHTML=oh||'<div class="empty">Sin oficinas</div>';
-  let eh='';DB.ejecutivos.forEach(ej=>{eh+='<div class="ai"><input class="ed" value="'+ej.nombre+'" onblur="uEjN(\''+ej.id+'\',this.value)"><select class="sel" onchange="uEjO(\''+ej.id+'\',this.value)">'+DB.oficinas.map(o=>'<option value="'+o.id+'"'+(o.id===ej.oficina?' selected':'')+'>'+o.nombre+'</option>').join('')+'</select><input class="inp" value="'+(ej.fase||'')+'" placeholder="Fase (opcional)" maxlength="30" style="width:140px;" onblur="uEjFase(\''+ej.id+'\',this.value)"><button class="btn btn-sm btn-danger" onclick="dEj(\''+ej.id+'\')">Eliminar</button></div>';});
+  let eh='';DB.ejecutivos.forEach(ej=>{eh+='<div class="ai"><input class="ed" value="'+ej.nombre+'" onblur="uEjN(\''+ej.id+'\',this.value)"><select class="sel" onchange="uEjO(\''+ej.id+'\',this.value)">'+DB.oficinas.map(o=>'<option value="'+o.id+'"'+(o.id===ej.oficina?' selected':'')+'>'+o.nombre+'</option>').join('')+'</select><input class="inp" value="'+(ej.fase||'')+'" placeholder="Fase" maxlength="30" style="width:110px;" onblur="uEjFase(\''+ej.id+'\',this.value)"><input class="inp" value="'+(ej.responsable_seguimiento||'')+'" placeholder="Responsable seguimiento" maxlength="60" style="width:180px;" onblur="uEjResp(\''+ej.id+'\',this.value)"><button class="btn btn-sm btn-danger" onclick="dEj(\''+ej.id+'\')">Eliminar</button></div>';});
   document.getElementById('adej').innerHTML=eh||'<div class="empty">Sin ejecutivos</div>';
   if(!isSA)return;
   renderEvalLayoutsAdmin();
@@ -1993,6 +1993,10 @@ function uEjN(id,v){const e=DB.ejecutivos.find(e=>e.id===id);if(e){e.nombre=v;sa
 function uEjO(id,v){const e=DB.ejecutivos.find(e=>e.id===id);if(e){e.oficina=v;save();if(USE_SUPABASE)sbSaveEjecutivo(id,e.nombre,v,e.fase||'');}
 }
 function uEjFase(id,v){const e=DB.ejecutivos.find(e=>e.id===id);if(e){e.fase=v.trim();save();if(USE_SUPABASE)sbSaveEjecutivo(id,e.nombre,e.oficina,e.fase);}
+}
+function uEjResp(id,v){
+  const e=DB.ejecutivos.find(e=>e.id===id);
+  if(e){e.responsable_seguimiento=v.trim();save();if(USE_SUPABASE&&SB)SB.from('ejecutivos').update({responsable_seguimiento:v.trim()}).eq('id',id).then(({error})=>{if(error)console.error('uEjResp:',error);});}
 }
 function uCN(ci,v){DB.criterios[ci].nombre=v;save();}
 function uCP(ci,v){DB.criterios[ci].peso=parseInt(v)||0;save();}
@@ -2935,11 +2939,12 @@ function exportEstrategico(){
     if(!evs.length){alert('No hay evaluaciones para exportar con los filtros actuales');return;}
     evs.sort((a,b)=>a.mes.localeCompare(b.mes));
     const rows=[['Mes','Ejecutivo','Oficina','Fase','Layout','Score',...DB.criterios.map(c=>c.nombre),'Evaluador','Notas','Fecha']];
+    const cell=v=>(v===null||v===undefined)?'':typeof v==='object'?'':v;
     evs.forEach(ev=>{
       const ej=gEj(ev.ejecutivo);const of=gOf(ej.oficina);
-      const cS=DB.criterios.map((_,ci)=>ev.criterios?ev.criterios[ci]:'');
+      const cS=DB.criterios.map((_,ci)=>ev.criterios&&ev.criterios[ci]!==undefined&&ev.criterios[ci]!==null?ev.criterios[ci]:'');
       const lyt=ev.layout||ev.layout_id;
-      rows.push([mL(ev.mes),ej.nombre,of.nombre,ej.fase||'',lyt?'Opción '+lyt:'',ev.score,...cS,ev.evaluador||'',ev.notas||'',(ev.fecha||'').split('T')[0]]);
+      rows.push([cell(mL(ev.mes)),cell(ej.nombre),cell(of.nombre),cell(ej.fase),cell(lyt?'Opción '+lyt:''),ev.score!==null&&ev.score!==undefined?ev.score:'',...cS,cell(ev.evaluador),cell(ev.notas),cell((ev.fecha||'').split('T')[0])]);
     });
     if(typeof XLSX!=='undefined'){
       const ws=XLSX.utils.aoa_to_sheet(rows);
