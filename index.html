@@ -2958,21 +2958,24 @@ function exportEstrategico(){
       rows.push([cell(mL(ev.mes)),cell(ej.nombre),cell(of.nombre),cell(ej.fase),cell(ej.responsable_seguimiento),cell(lyt?'Opción '+lyt:''),typeof ev.score==='number'?ev.score:'',...cS,cell(ev.evaluador),cell(ev.notas),cell((ev.fecha||'').split('T')[0])]);
     });
     if(typeof XLSX!=='undefined'){
-      // Sanitizar TODAS las celdas antes de pasar a XLSX
+      // Sanitizar TODAS las celdas — forzar string siempre
       const safeRows=rows.map(row=>row.map(v=>{
         if(v===null||v===undefined)return '';
-        if(typeof v==='number'&&isFinite(v))return v;
+        if(typeof v==='number')return isFinite(v)?String(v):'';
         if(typeof v==='boolean')return v?'Sí':'No';
         if(typeof v==='object')return '';
-        return String(v);
+        try{return String(v);}catch(e){return '';}
       }));
-      const ws=XLSX.utils.aoa_to_sheet(safeRows);
-      ws['!cols']=[{wch:10},{wch:28},{wch:22},{wch:12},{wch:12},{wch:8},...DB.criterios.map(()=>({wch:14})),{wch:16},{wch:30},{wch:12}];
-      const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,'Estratégico',ws);
-      const wbout=XLSX.write(wb,{bookType:'xlsx',type:'array',compression:true});
-      const fn='Estrategico_'+new Date().toISOString().split('T')[0]+'.xlsx';
-      const ok=descargarArchivo(new Uint8Array(wbout),fn,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-      if(ok)return;
+      let wb,ws;
+      try{
+        ws=XLSX.utils.aoa_to_sheet(safeRows);
+        wb=XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb,'Estrategico',ws);
+        const wbout=XLSX.write(wb,{bookType:'xlsx',type:'array'});
+        const fn='Estrategico_'+new Date().toISOString().split('T')[0]+'.xlsx';
+        const ok=descargarArchivo(new Uint8Array(wbout),fn,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        if(ok)return;
+      }catch(xe){console.error('XLSX falló, usando CSV:',xe);}
     }
     // Fallback CSV
     const csv=rows.map(r=>r.map(v=>'"'+String(v||'').replace(/"/g,'""')+'"').join(',')).join('\n');
