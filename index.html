@@ -1278,7 +1278,7 @@ async function sbInit(){
   try{
     const {data:ofs}=await SB.from('oficinas').select('id,nombre').order('nombre');
     if(ofs&&ofs.length)DB.oficinas=ofs.map(o=>({id:o.id,nombre:o.nombre}));
-    const {data:ejs}=await SB.from('ejecutivos').select('id,nombre,oficina_id,fase').eq('activo',true).order('nombre');
+    const {data:ejs}=await SB.from('ejecutivos').select('id,nombre,oficina_id,fase,responsable_seguimiento').eq('activo',true).order('nombre');
     if(ejs&&ejs.length)DB.ejecutivos=ejs.map(e=>({id:e.id,nombre:e.nombre,oficina:e.oficina_id,fase:e.fase||'',responsable_seguimiento:e.responsable_seguimiento||''}));
     const {data:evs}=await SB.from('evaluaciones').select('*');
     if(evs&&evs.length){
