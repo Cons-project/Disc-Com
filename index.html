@@ -479,7 +479,7 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFAF8;}
   </div>
   <div class="tw">
     <div class="th2" style="display:flex;align-items:center;justify-content:space-between;"><span class="tt" id="ac-tl">Ejecutivos con actividad</span><button class="btn btn-sm" onclick="exportActividad()" style="background:var(--am2);color:var(--am);border:1px solid var(--am);">⬇ Exportar Actividad</button></div>
-    <table><thead><tr><th>Ejecutivo</th><th>Oficina</th><th>Actividad este mes</th><th>Última actividad</th><th>Tipo</th><th>Score</th><th>Evaluador</th><th>Notas</th><th>Estado</th><th></th></tr></thead><tbody id="ac-tbody"></tbody></table>
+    <table><thead><tr><th>Ejecutivo</th><th>Oficina</th><th>Responsable Seguim.</th><th>Actividad este mes</th><th>Última actividad</th><th>Tipo</th><th>Score</th><th>Evaluador</th><th>Notas</th><th>Estado</th><th></th></tr></thead><tbody id="ac-tbody"></tbody></table>
   </div>
   <div id="ac-historial-wrap" style="display:none;margin-top:20px;">
     <div style="font-size:14px;font-weight:600;margin-bottom:12px;" id="ac-hist-title">Historial</div>
@@ -832,6 +832,20 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFAF8;}
      JAVASCRIPT
 ══════════════════════════════════════════════════════════ -->
 <script>
+// ── XLSX SAFE PATCH: sanitiza todas las celdas antes de crear hoja ──
+if(typeof XLSX!=='undefined'){
+  const _origAoa=XLSX.utils.aoa_to_sheet;
+  XLSX.utils.aoa_to_sheet=function(data,opts){
+    const sd=data.map(row=>(row||[]).map(v=>{
+      if(v===null||v===undefined)return '';
+      if(typeof v==='number')return isFinite(v)?v:'';
+      if(typeof v==='boolean')return v?'Sí':'No';
+      if(typeof v==='object')return '';
+      try{return String(v);}catch(e){return '';}
+    }));
+    return _origAoa.call(this,sd,opts);
+  };
+}
 // ── CONFIG ─────────────────────────────────────────────────
 const USE_SUPABASE = true; // → cambiar a true y poner credenciales para producción
 const SUPABASE_URL = 'https://dujxlwdwqovtwcmfbgqq.supabase.co';
@@ -1984,15 +1998,17 @@ function resetEvalLayouts(){
 }
 
 async function sbDeleteOficina(id){if(!SB)return;await SB.from('oficinas').delete().eq('id',id);}
-function dOf(id){
+async function dOf(id){
   const o=DB.oficinas.find(of=>of.id===id);if(!o)return;
   const ejecs=DB.ejecutivos.filter(e=>e.oficina===id).length;
   if(ejecs>0){alert('No se puede eliminar "'+o.nombre+'" porque tiene '+ejecs+' ejecutivos asignados. Reasigna o elimina los ejecutivos primero.');return;}
   if(!confirm('¿Eliminar oficina "'+o.nombre+'"? Esta acción no se puede deshacer.'))return;
+  if(USE_SUPABASE&&SB){
+    const r=await SB.from('oficinas').delete().eq('id',id);
+    if(r.error){alert('Error al eliminar de BD: '+r.error.message);return;}
+  }
   DB.oficinas=DB.oficinas.filter(of=>of.id!==id);
-  save();
-  if(USE_SUPABASE)sbDeleteOficina(id);
-  rAdmin();
+  save();rAdmin();
 }
 function uOf(id,v){const l=v.trim();if(!l)return;const d=DB.oficinas.find(o=>o.id!==id&&o.nombre.toLowerCase()===l.toLowerCase());if(d){alert('Ya existe: '+d.nombre);rAdmin();return;}const o=DB.oficinas.find(o=>o.id===id);if(o){o.nombre=l;save();if(USE_SUPABASE)sbSaveOficina(id,l);}}
 function uEjN(id,v){const e=DB.ejecutivos.find(e=>e.id===id);if(e){e.nombre=v;save();if(USE_SUPABASE)sbSaveEjecutivo(id,v,e.oficina,e.fase||'');}
@@ -2022,12 +2038,16 @@ function addOf(){
   if(USE_SUPABASE){sbAddOficina(l).then(id=>{if(id){DB.oficinas.push({id,nombre:l});save();el.value='';rAdmin();}});}
   else{DB.oficinas.push({id:'o'+Date.now(),nombre:l});save();el.value='';rAdmin();}
 }
-function dEj(id){
+async function dEj(id){
   if(!confirm('Eliminar este ejecutivo y todas sus evaluaciones?'))return;
+  if(USE_SUPABASE&&SB){
+    const r=await SB.from('ejecutivos').update({activo:false}).eq('id',id);
+    if(r.error){alert('Error al eliminar de BD: '+r.error.message);return;}
+    await SB.from('evaluaciones').update({erased:true}).eq('ejecutivo_id',id);
+  }
   DB.ejecutivos=DB.ejecutivos.filter(e=>e.id!==id);
   DB.evaluaciones=DB.evaluaciones.filter(e=>e.ejecutivo!==id);
   save();lES();rAdmin();
-  if(USE_SUPABASE){SB.from('ejecutivos').update({activo:false}).eq('id',id);SB.from('evaluaciones').delete().eq('ejecutivo_id',id);}
 }
 function openAE(){
   const s=document.getElementById('nejof');s.innerHTML=DB.oficinas.map(o=>'<option value="'+o.id+'">'+o.nombre+'</option>').join('');
@@ -2178,9 +2198,10 @@ function acRender(){
       elimBtn='<button class="btn btn-sm btn-danger" style="font-size:10px;padding:3px 8px;margin-left:4px;" onclick="acBorrarRegistro(\''+tipo+'\',\''+targetId+'\',\''+ej.id+'\')" title="Eliminar último registro">Eliminar</button>';
     }
 
-    h+='<tr><td style="font-weight:500">'+ej.nombre+'</td><td>'+gOf(ej.oficina).nombre+'</td><td style="font-size:13px;">'+enMes+'</td><td style="font-size:11px;color:var(--t2);white-space:nowrap;">'+uf+'</td><td>'+tipoCell+'</td><td>'+scoreCell+'</td><td>'+evalCell+'</td><td style="max-width:180px;">'+notasCell+'</td><td>'+estado+'</td><td style="white-space:nowrap;"><button class="btn btn-sm" onclick="acVerHist(\''+ej.id+'\')">Ver historial</button>'+elimBtn+'</td></tr>';
+    const respCell=ej.responsable_seguimiento?'<span style="font-size:11px;color:var(--t2);">'+ej.responsable_seguimiento+'</span>':'<span style="color:var(--t3);">—</span>';
+    h+='<tr><td style="font-weight:500">'+ej.nombre+'</td><td>'+gOf(ej.oficina).nombre+'</td><td>'+respCell+'</td><td style="font-size:13px;">'+enMes+'</td><td style="font-size:11px;color:var(--t2);white-space:nowrap;">'+uf+'</td><td>'+tipoCell+'</td><td>'+scoreCell+'</td><td>'+evalCell+'</td><td style="max-width:180px;">'+notasCell+'</td><td>'+estado+'</td><td style="white-space:nowrap;"><button class="btn btn-sm" onclick="acVerHist(\''+ej.id+'\')">Ver historial</button>'+elimBtn+'</td></tr>';
   });
-  document.getElementById('ac-tbody').innerHTML=h||'<tr><td colspan="10" class="empty">Sin resultados</td></tr>';
+  document.getElementById('ac-tbody').innerHTML=h||'<tr><td colspan="11" class="empty">Sin resultados</td></tr>';
 }
 function acVerHist(ejId){
   const ej=gEj(ejId);
@@ -2240,7 +2261,7 @@ function exportActividad(){
 
     // Helper: asegurar que todo valor sea string o número para XLSX
     const cell=v=>(v===null||v===undefined)?'':typeof v==='object'?JSON.stringify(v):v;
-    const hdrRes=['Ejecutivo','Oficina','Fase','Total actividades','Evaluaciones','Acompañamientos','Última actividad','Tipo última','Último Score','Última Eval - Mes','Última Eval - Layout','Última Eval - Evaluador','Última Eval - Notas'];
+    const hdrRes=['Ejecutivo','Oficina','Fase','Responsable Seguimiento','Total actividades','Evaluaciones','Acompañamientos','Última actividad','Tipo última','Último Score','Última Eval - Mes','Última Eval - Layout','Última Eval - Evaluador','Última Eval - Notas'];
     const rowsRes=[hdrRes];
     DB.ejecutivos.forEach(ej=>{
       const of=gOf(ej.oficina);
@@ -2250,7 +2271,7 @@ function exportActividad(){
       const last=all[0];
       const lastEval=all.find(a=>a.tipo==='Evaluación');
       rowsRes.push([
-        cell(ej.nombre),cell(of.nombre),cell(ej.fase),all.length,evs.length,acomps.length,
+        cell(ej.nombre),cell(of.nombre),cell(ej.fase),cell(ej.responsable_seguimiento),all.length,evs.length,acomps.length,
         cell(last?last.fecha:''),cell(last?last.tipo:''),
         lastEval?lastEval.obj.score:'',
         cell(lastEval?mL(lastEval.obj.mes):''),
@@ -2259,12 +2280,13 @@ function exportActividad(){
         cell(lastEval?lastEval.obj.notas:'')
       ]);
     });
-    const wsRes=XLSX.utils.aoa_to_sheet(rowsRes);
+    const safe=arr=>arr.map(row=>row.map(v=>{if(v===null||v===undefined)return '';if(typeof v==='number')return isFinite(v)?String(v):'';if(typeof v==='boolean')return v?'Sí':'No';if(typeof v==='object')return '';try{return String(v);}catch(e){return '';}}));
+    const wsRes=XLSX.utils.aoa_to_sheet(safe(rowsRes));
     wsRes['!cols']=[{wch:28},{wch:22},{wch:12},{wch:10},{wch:10},{wch:14},{wch:12},{wch:14},{wch:8},{wch:12},{wch:14},{wch:16},{wch:30}];
     XLSX.utils.book_append_sheet(wb,'Resumen',wsRes);
 
     // Hoja 2: Historial completo con desglose por rubros
-    const hdrHist=['Ejecutivo','Oficina','Fecha','Tipo','Mes','Layout','Score',...DB.criterios.map(c=>c.nombre),'Compromiso','Cumplió anterior','Evaluador','Notas'];
+    const hdrHist=['Ejecutivo','Oficina','Responsable Seguimiento','Fecha','Tipo','Mes','Layout','Score',...DB.criterios.map(c=>c.nombre),'Compromiso','Cumplió anterior','Evaluador','Notas'];
     const rowsHist=[hdrHist];
     DB.ejecutivos.forEach(ej=>{
       const of=gOf(ej.oficina);
@@ -2279,19 +2301,19 @@ function exportActividad(){
           const e=item.obj;
           const cS=DB.criterios.map((_,ci)=>e.criterios&&e.criterios[ci]!==undefined?e.criterios[ci]:'');
           const lyt=e.layout||e.layout_id;
-          rowsHist.push([cell(ej.nombre),cell(of.nombre),cell(item.fecha),'Evaluación',cell(mL(e.mes)),cell(lyt?'Opción '+lyt:''),e.score!==null&&e.score!==undefined?e.score:'',...cS,'','',cell(e.evaluador),cell(e.notas)]);
+          rowsHist.push([cell(ej.nombre),cell(of.nombre),cell(ej.responsable_seguimiento),cell(item.fecha),'Evaluación',cell(mL(e.mes)),cell(lyt?'Opción '+lyt:''),e.score!==null&&e.score!==undefined?e.score:'',...cS,'','',cell(e.evaluador),cell(e.notas)]);
         }else{
           const a=item.obj;
           const cumplioTxt=a.cumplio_anterior===null||a.cumplio_anterior===undefined?'':a.cumplio_anterior?'Sí':'No';
-          rowsHist.push([cell(ej.nombre),cell(of.nombre),cell(item.fecha),'Acompañamiento','','','',...DB.criterios.map(()=>''),cell(a.compromiso_nuevo),cumplioTxt,cell(a.registrado_por),cell(a.notas)]);
+          rowsHist.push([cell(ej.nombre),cell(of.nombre),cell(ej.responsable_seguimiento),cell(item.fecha),'Acompañamiento','','','',...DB.criterios.map(()=>''),cell(a.compromiso_nuevo),cumplioTxt,cell(a.registrado_por),cell(a.notas)]);
         }
       });
     });
-    const wsHist=XLSX.utils.aoa_to_sheet(rowsHist);
+    const wsHist=XLSX.utils.aoa_to_sheet(safe(rowsHist));
     wsHist['!cols']=[{wch:28},{wch:22},{wch:12},{wch:14},{wch:10},{wch:12},{wch:8},...DB.criterios.map(()=>({wch:14})),{wch:40},{wch:14},{wch:16},{wch:30}];
     XLSX.utils.book_append_sheet(wb,'Historial completo',wsHist);
 
-    const wbout=XLSX.write(wb,{bookType:'xlsx',type:'array',compression:true});
+    const wbout=XLSX.write(wb,{bookType:'xlsx',type:'array',});
     const fn='Actividad_Ejecutivos_'+new Date().toISOString().split('T')[0]+'.xlsx';
     descargarArchivo(new Uint8Array(wbout),fn,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   }catch(e){console.error('exportActividad:',e);alert('Error al exportar: '+e.message);}
@@ -2541,7 +2563,7 @@ function exportarExcel(){
       XLSX.utils.book_append_sheet(wb,'Acompañamiento',ws2);
 
       const now=new Date();const fn='DisciplinaComercial_'+now.getFullYear()+String(now.getMonth()+1).padStart(2,'0')+'.xlsx';
-      const wbout=XLSX.write(wb,{bookType:'xlsx',type:'array',compression:true});
+      const wbout=XLSX.write(wb,{bookType:'xlsx',type:'array',});
       const ok=descargarArchivo(new Uint8Array(wbout),fn,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       if(ok)return;
     }
