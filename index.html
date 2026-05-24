@@ -439,9 +439,15 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFAF8;}
       <div style="font-size:12px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">Comentarios del evaluador</div>
       <textarea id="retro-comentarios" class="inp" rows="3" placeholder="Agrega observaciones adicionales, compromisos o contexto de la sesión..." style="width:100%;font-family:inherit;resize:vertical;"></textarea>
     </div>
-    <div style="display:flex;gap:10px;justify-content:flex-end;">
-      <button class="btn" onclick="retroGuardar(false)">Guardar sin retroalimentación</button>
-      <button class="btn btn-p" onclick="retroGuardar(true)">✓ Confirmar y guardar con retro</button>
+    <div style="display:flex;gap:10px;justify-content:space-between;flex-wrap:wrap;">
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-sm" onclick="retroCopiar()" title="Copiar retroalimentación como texto">📋 Copiar</button>
+        <button class="btn btn-sm" onclick="retroDescargar()" title="Descargar como archivo de texto">⬇ Descargar</button>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn" onclick="retroGuardar(false)">Guardar sin retroalimentación</button>
+        <button class="btn btn-p" onclick="retroGuardar(true)">✓ Confirmar y guardar con retro</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1951,6 +1957,56 @@ function abrirRetroModal(score,porCrit){
   document.getElementById('retro-comentarios').value='';
   document.getElementById('retro-modal').style.display='flex';
   }catch(err){console.warn('retro modal err:',err);document.getElementById('retro-modal').style.display='none';retroGuardar(false);}
+}
+
+function retroTextoPlano(){
+  if(!_pendingEval)return'';
+  const ej=gEj(_pendingEval.ejecutivo);
+  const score=_pendingEval.score;
+  const tono=score>=80?'Reconocimiento':score>=60?'En desarrollo':'Plan de apoyo';
+  const comentarios=document.getElementById('retro-comentarios').value.trim();
+  const porCrit=_pendingEval._porCrit||{};
+  let txt='';
+  txt+='RETROALIMENTACIÓN — '+ej.nombre+'\n';
+  txt+='Fecha: '+new Date().toLocaleDateString('es-MX')+'\n';
+  txt+='Score: '+score+'/100 ('+tono+')\n';
+  txt+='Evaluador: '+(SESSION?.usuario||'')+'\n';
+  txt+='\n── PUNTOS A REFORZAR ──────────────────\n';
+  let hayFallas=false;
+  DB.criterios.forEach((c,ci)=>{
+    const pc=porCrit[ci];if(!pc||!pc.fail.length)return;
+    hayFallas=true;
+    const pct=pc.max?Math.round((pc.got/pc.max)*100):0;
+    txt+='\n'+c.nombre+' ('+pct+'%)\n';
+    pc.fail.forEach(f=>{txt+='  • '+f+'\n';});
+  });
+  if(!hayFallas)txt+='¡Sin puntos fallados!\n';
+  // Tableros seleccionados
+  const tablerosSel=TABLEROS_RETRO.filter((_,ti)=>{const el=document.getElementById('ret-t-'+ti);return el&&el.checked;});
+  if(tablerosSel.length){
+    txt+='\n── TABLEROS A REPASAR ─────────────────\n';
+    tablerosSel.forEach(t=>{txt+='  • '+t+'\n';});
+  }
+  if(comentarios){
+    txt+='\n── COMENTARIOS DEL EVALUADOR ──────────\n'+comentarios+'\n';
+  }
+  return txt;
+}
+
+function retroCopiar(){
+  const txt=retroTextoPlano();
+  if(!txt)return;
+  navigator.clipboard.writeText(txt).then(()=>alert('✓ Retroalimentación copiada al portapapeles')).catch(()=>{
+    // Fallback para Safari/Brave
+    const ta=document.createElement('textarea');ta.value=txt;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);alert('✓ Retroalimentación copiada al portapapeles');
+  });
+}
+
+function retroDescargar(){
+  const txt=retroTextoPlano();if(!txt)return;
+  const ej=gEj(_pendingEval.ejecutivo);
+  const fn='Retro_'+ej.nombre.replace(/\s+/g,'_')+'_'+new Date().toISOString().split('T')[0]+'.txt';
+  descargarArchivo(txt,fn,'text/plain;charset=utf-8;');
 }
 
 async function retroGuardar(conRetro){
