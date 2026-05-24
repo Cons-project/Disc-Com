@@ -2,6 +2,9 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Disciplina Comercial</title>
 <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
@@ -408,6 +411,37 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFAF8;}
       <button class="btn btn-sm" onclick="impDownloadTemplate()" style="margin-bottom:10px;">⬇ Descargar plantilla Excel</button>
       <input type="file" id="imp-file" accept=".xlsx,.xls,.csv" onchange="impParseFile(event)" style="display:block;margin-bottom:10px;">
       <div id="imp-preview" style="margin-top:10px;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Retroalimentación post-evaluación -->
+<div id="retro-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:1100;align-items:flex-start;justify-content:center;overflow-y:auto;padding:20px 10px;">
+  <div style="background:var(--surface);border-radius:var(--r);max-width:680px;width:100%;padding:24px;margin:auto;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <div style="font-size:18px;font-weight:600;" id="retro-titulo">Retroalimentación</div>
+      <div style="font-size:22px;font-weight:700;" id="retro-score-badge"></div>
+    </div>
+    <!-- Mensaje soft -->
+    <div id="retro-msg" style="padding:14px 16px;border-radius:var(--rs);margin-bottom:18px;font-size:14px;line-height:1.6;border-left:4px solid;"></div>
+    <!-- Criterios a reforzar -->
+    <div id="retro-criterios-wrap" style="margin-bottom:18px;">
+      <div style="font-size:12px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px;">Puntos a reforzar</div>
+      <div id="retro-criterios"></div>
+    </div>
+    <!-- Checklist tableros -->
+    <div style="margin-bottom:18px;">
+      <div style="font-size:12px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">Tableros sugeridos a repasar</div>
+      <div id="retro-tableros" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;"></div>
+    </div>
+    <!-- Comentarios evaluador -->
+    <div style="margin-bottom:20px;">
+      <div style="font-size:12px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">Comentarios del evaluador</div>
+      <textarea id="retro-comentarios" class="inp" rows="3" placeholder="Agrega observaciones adicionales, compromisos o contexto de la sesión..." style="width:100%;font-family:inherit;resize:vertical;"></textarea>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;">
+      <button class="btn" onclick="retroGuardar(false)">Guardar sin retroalimentación</button>
+      <button class="btn btn-p" onclick="retroGuardar(true)">✓ Confirmar y guardar con retro</button>
     </div>
   </div>
 </div>
@@ -1316,7 +1350,7 @@ async function sbInit(){
     if(ejs&&ejs.length)DB.ejecutivos=ejs.map(e=>({id:e.id,nombre:e.nombre,oficina:e.oficina_id,fase:e.fase||'',responsable_seguimiento:e.responsable_seguimiento||''}));
     const {data:evs}=await SB.from('evaluaciones').select('*');
     if(evs&&evs.length){
-      DB.evaluaciones=evs.filter(ev=>!ev.erased).map(ev=>({id:ev.id,sb_id:ev.id,ejecutivo:ev.ejecutivo_id,mes:ev.mes,score:ev.score,criterios:ev.scores_criterios,notas:ev.notas||'',guardada:ev.guardada,evaluador:ev.evaluador||'',detalle:ev.detalle_checks||null,bancos:ev.bancos_sel||null,layout:ev.layout_id||null,layout_id:ev.layout_id||null,fecha:ev.fecha||null}));
+      DB.evaluaciones=evs.filter(ev=>!ev.erased).map(ev=>({id:ev.id,sb_id:ev.id,ejecutivo:ev.ejecutivo_id,mes:ev.mes,score:ev.score,criterios:ev.scores_criterios,notas:ev.notas||'',guardada:ev.guardada,evaluador:ev.evaluador||'',detalle:ev.detalle_checks||null,bancos:ev.bancos_sel||null,layout:ev.layout_id||null,layout_id:ev.layout_id||null,fecha:ev.fecha||null,retro:ev.retro||null}));
     }else DB.evaluaciones=[];
     // MVP3: Load Ágil evaluations
     try{
@@ -1354,13 +1388,12 @@ async function sbSaveEval(obj){
   if(!SB)return;
   try{
     const fechaIso=obj.fecha||new Date().toISOString();
-    // Si ya tiene id real (uuid), actualizar; si no, insertar nuevo
     if(obj.sb_id){
       const {error}=await SB.from('evaluaciones').update({
         score:obj.score,scores_criterios:obj.criterios,
         notas:obj.notas,guardada:obj.guardada,evaluador:obj.evaluador||SESSION?.usuario||'',
         detalle_checks:obj.detalle,bancos_sel:obj.bancos,layout_id:obj.layout||obj.layout_id||1,
-        fecha:fechaIso
+        fecha:fechaIso,retro:obj.retro||null
       }).eq('id',obj.sb_id);
       if(error)throw error;
     }else{
@@ -1368,7 +1401,7 @@ async function sbSaveEval(obj){
         ejecutivo_id:obj.ejecutivo,mes:obj.mes,score:obj.score,scores_criterios:obj.criterios,
         notas:obj.notas,guardada:obj.guardada,evaluador:obj.evaluador||SESSION?.usuario||'',
         detalle_checks:obj.detalle,bancos_sel:obj.bancos,layout_id:obj.layout||obj.layout_id||1,
-        fecha:fechaIso
+        fecha:fechaIso,retro:obj.retro||null
       }).select('id').single();
       if(error)throw error;
       const idx=DB.evaluaciones.findIndex(e=>e.id===obj.id);
@@ -1819,6 +1852,24 @@ async function impGuardarBulk(){
   if(typeof refreshAll==='function')refreshAll();
 }
 
+// ── TABLEROS RETRO ──────────────────────────────────────────
+const TABLEROS_RETRO=[
+  'Cuadro de mando — En general',
+  'Cuadro de mando — Filtros en general',
+  'Cuadro de mando — Tabla de Presupuesto (%)',
+  'Cuadro de mando — Indicador Crece y decrece',
+  'Cuadro de mando — Clave Agentes Activos',
+  'Cuadro de mando — Reactivación de agentes / Tabla de reactivación',
+  'Cuadro de mando — Tabla Detalle de presupuesto',
+  'Cuadro de mando — Detalle por oficina Operativa',
+  'Cuadro de mando — Detalle por agentes',
+  'Cuadro de mando — Claves de agentes',
+  'Tubería de Autos',
+  'Tubería de Daños'
+];
+
+let _pendingEval=null;
+
 function guardar(){
   const ejId=document.getElementById('eej').value;
   const mes=document.getElementById('emes').value;
@@ -1827,30 +1878,129 @@ function guardar(){
   const config=getEvalConfig(ES.layout);
   const porCrit={};
   config.forEach((p,i)=>{
-    if(!porCrit[p.criterio_idx])porCrit[p.criterio_idx]={got:0,max:0};
+    if(!porCrit[p.criterio_idx])porCrit[p.criterio_idx]={got:0,max:0,ok:[],fail:[]};
     porCrit[p.criterio_idx].max+=p.pts;
-    if(ES.c[i])porCrit[p.criterio_idx].got+=p.pts;
+    if(ES.c[i]){porCrit[p.criterio_idx].got+=p.pts;porCrit[p.criterio_idx].ok.push(p.texto);}
+    else porCrit[p.criterio_idx].fail.push(p.texto);
   });
   let tot=0;const cS=[];
   DB.criterios.forEach((c,ci)=>{const pc=porCrit[ci]||{got:0,max:0};const pct=pc.max?Math.round((pc.got/pc.max)*100):0;cS.push(pct);tot+=pc.got;});
   const s=Math.round(tot);
-  // SIEMPRE nueva: nunca sobrescribe (modelo 1 eval = 1 registro)
   if(!ES.local_id)ES.local_id='ev'+Date.now();
   const fecha=new Date().toISOString();
-  const obj={id:ES.local_id,sb_id:ES.sb_id||null,ejecutivo:ejId,mes,score:s,criterios:cS,notas,guardada:true,evaluador:SESSION?.usuario||'',detalle:ES.c.slice(),bancos:null,layout:ES.layout,layout_id:ES.layout,fecha};
-  const idx=DB.evaluaciones.findIndex(e=>e.id===ES.local_id);
+  _pendingEval={id:ES.local_id,sb_id:ES.sb_id||null,ejecutivo:ejId,mes,score:s,criterios:cS,notas,guardada:true,evaluador:SESSION?.usuario||'',detalle:ES.c.slice(),bancos:null,layout:ES.layout,layout_id:ES.layout,fecha,retro:null,_porCrit:porCrit};
+  // Safety net: si el modal falla por cualquier razón, guardar directamente sin retro
+  try{
+    abrirRetroModal(s,porCrit);
+  }catch(err){
+    console.warn('Modal de retro falló, guardando sin retroalimentación:',err);
+    retroGuardar(false);
+  }
+}
+
+function abrirRetroModal(score,porCrit){
+  try{
+  // Mensaje soft según score
+  let bgColor,borderColor,msg;
+  if(score>=80){
+    bgColor='var(--gn2)';borderColor='var(--gn)';
+    msg='<b>¡Excelente trabajo!</b> Esta evaluación refleja una disciplina comercial sólida. Hay algunos puntos donde podemos seguir creciendo para llegar al siguiente nivel.';
+  }else if(score>=60){
+    bgColor='var(--am2)';borderColor='var(--am)';
+    msg='<b>Buen avance.</b> Hay bases sólidas en varios criterios. Te comparto los puntos donde enfocarnos juntos para seguir desarrollando la disciplina comercial.';
+  }else{
+    bgColor='#FEF0F0';borderColor='var(--rd)';
+    msg='<b>Gracias por tu tiempo en esta sesión.</b> Vamos a trabajar juntos en los siguientes puntos para fortalecer la disciplina comercial. Cada área de oportunidad es un paso hacia mejores resultados.';
+  }
+  document.getElementById('retro-msg').style.background=bgColor;
+  document.getElementById('retro-msg').style.borderLeftColor=borderColor;
+  document.getElementById('retro-msg').innerHTML=msg;
+  document.getElementById('retro-score-badge').innerHTML='<span style="color:'+sc(score)+';">'+score+'<span style="font-size:13px;font-weight:400;color:var(--t2);">/100</span></span>';
+
+  // Criterios con preguntas falladas
+  let critHtml='';
+  DB.criterios.forEach((c,ci)=>{
+    const pc=porCrit[ci];
+    if(!pc||!pc.fail.length)return;
+    const pct=pc.max?Math.round((pc.got/pc.max)*100):0;
+    critHtml+='<div style="background:var(--bg);border:1px solid var(--bd);border-radius:var(--rs);padding:10px 12px;margin-bottom:8px;">';
+    critHtml+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">';
+    critHtml+='<span style="font-size:13px;font-weight:600;">'+c.nombre+'</span>';
+    critHtml+='<span style="font-size:12px;font-weight:600;color:'+sc(pct)+';">'+pct+'%</span>';
+    critHtml+='</div>';
+    pc.fail.forEach(f=>{
+      critHtml+='<div style="font-size:12px;color:var(--t2);padding:3px 0 3px 12px;border-left:2px solid var(--rd);margin-bottom:3px;">'+f+'</div>';
+    });
+    critHtml+='</div>';
+  });
+  if(!critHtml)critHtml='<div style="font-size:13px;color:var(--gn);padding:8px;">¡Sin puntos fallados! Evaluación perfecta.</div>';
+  document.getElementById('retro-criterios').innerHTML=critHtml;
+
+  // Checklist tableros — preseleccionar los relevantes según criterios con score<70
+  const weak=new Set();
+  DB.criterios.forEach((c,ci)=>{const pc=porCrit[ci];if(pc&&pc.max&&(pc.got/pc.max)<0.7)weak.add(ci);});
+  // Si tiene problemas con criterio 2 (Tuberías) → preseleccionar tableros de Tubería
+  let tabHtml='';
+  TABLEROS_RETRO.forEach((t,ti)=>{
+    const autoCheck=t.toLowerCase().includes('tuber')&&weak.has(2)||t.toLowerCase().includes('agente')&&(weak.has(1)||weak.has(4))||t.toLowerCase().includes('presupuesto')&&weak.has(0);
+    tabHtml+='<label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--t2);padding:5px 8px;background:var(--bg);border-radius:4px;border:0.5px solid var(--bd);cursor:pointer;">';
+    tabHtml+='<input type="checkbox" id="ret-t-'+ti+'"'+(autoCheck?' checked':'')+' style="width:14px;height:14px;cursor:pointer;">';
+    tabHtml+=t+'</label>';
+  });
+  document.getElementById('retro-tableros').innerHTML=tabHtml;
+  document.getElementById('retro-comentarios').value='';
+  document.getElementById('retro-modal').style.display='flex';
+  }catch(err){console.warn('retro modal err:',err);document.getElementById('retro-modal').style.display='none';retroGuardar(false);}
+}
+
+async function retroGuardar(conRetro){
+  if(!_pendingEval){document.getElementById('retro-modal').style.display='none';return;}
+  try{
+  const obj=Object.assign({},_pendingEval);
+  delete obj._porCrit;
+  if(conRetro){
+    const tableros=TABLEROS_RETRO.filter((_,ti)=>{const el=document.getElementById('ret-t-'+ti);return el&&el.checked;});
+    const comentarios=document.getElementById('retro-comentarios').value.trim();
+    // Criterios fallados para guardar en retro
+    const porCrit=_pendingEval._porCrit;
+    const criteriosRetro=DB.criterios.map((c,ci)=>{
+      const pc=porCrit[ci]||{got:0,max:0,fail:[]};
+      return{nombre:c.nombre,score:pc.max?Math.round((pc.got/pc.max)*100):0,preguntas_falladas:pc.fail||[]};
+    }).filter(c=>c.preguntas_falladas.length>0);
+    obj.retro={
+      tono:obj.score>=80?'reconocimiento':obj.score>=60?'desarrollo':'apoyo',
+      criterios_reforzar:criteriosRetro,
+      tableros_sugeridos:tableros,
+      comentarios_evaluador:comentarios,
+      fecha:new Date().toISOString()
+    };
+  }
+  // Guardar
+  const idx=DB.evaluaciones.findIndex(e=>e.id===obj.id);
   if(idx>=0)DB.evaluaciones[idx]=obj;else DB.evaluaciones.push(obj);
   save();
   if(USE_SUPABASE)sbSaveEval(obj);
-  alert('Evaluación guardada como NUEVO registro. Opción '+ES.layout+' · Score: '+s+'/100');
-  // Detonar refresh completo del frontend (principio BI: Evaluar es la tabla maestra)
+  document.getElementById('retro-modal').style.display='none';
+  _pendingEval=null;
+  alert('Evaluación guardada. Opción '+obj.layout+' · Score: '+obj.score+'/100');
   ES.sb_id=null;ES.local_id=null;
   rD();
   if(typeof rEvo==='function')rEvo();
   if(typeof rOf==='function')rOf();
   if(document.getElementById('vw-acomp')&&document.getElementById('vw-acomp').classList.contains('active'))acRender();
   if(document.getElementById('vw-estrategico')&&document.getElementById('vw-estrategico').classList.contains('active'))initEstrategico();
-  if(document.getElementById('vw-historial')&&document.getElementById('vw-historial').classList.contains('active'))renderHistorial();
+  }catch(fatalErr){
+    console.error('retroGuardar fatal:',fatalErr);
+    document.getElementById('retro-modal').style.display='none';
+    if(_pendingEval){
+      const safe=Object.assign({},_pendingEval);delete safe._porCrit;safe.retro=null;
+      const sidx=DB.evaluaciones.findIndex(e=>e.id===safe.id);
+      if(sidx>=0)DB.evaluaciones[sidx]=safe;else DB.evaluaciones.push(safe);
+      save();if(USE_SUPABASE)sbSaveEval(safe);_pendingEval=null;
+      alert('Evaluación guardada. Score: '+safe.score+'/100');
+      ES.sb_id=null;ES.local_id=null;rD();
+    }
+  }
 }
 
 function rEvo(){
@@ -2300,7 +2450,30 @@ function acVerHist(ejId){
         });
         detalleHtml+='</div>';
       }
-      h+='<div style="background:var(--surface);border:1px solid var(--bd);border-left:3px solid '+sc(e.score)+';border-radius:var(--rs);padding:12px 14px;margin-bottom:8px;"><div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;"><span style="font-size:10px;font-weight:600;color:'+sc(e.score)+';text-transform:uppercase;">📊 Evaluación</span><span style="font-size:12px;font-weight:500;">'+(e.fecha?e.fecha.split('T')[0]:mL(e.mes))+'</span><span style="font-size:11px;color:var(--t3);">'+lytLbl+'</span><span style="font-size:13px;font-weight:600;color:'+sc(e.score)+';margin-left:auto;">'+e.score+'/100</span><span style="font-size:11px;color:var(--t3);">Evaluador: <b>'+(e.evaluador||'—')+'</b></span>'+delBtn+'</div>'+(e.notas?'<div style="font-size:12px;color:var(--t);">'+e.notas+'</div>':'<div style="font-size:11px;color:var(--t3);font-style:italic;">Sin notas</div>')+detalleHtml+'</div>';
+      // Retro card
+      let retroHtml='';
+      if(e.retro){
+        const r=e.retro;
+        const tonoBg=r.tono==='reconocimiento'?'var(--gn2)':r.tono==='desarrollo'?'var(--am2)':'#FEF0F0';
+        const tonoColor=r.tono==='reconocimiento'?'var(--gn)':r.tono==='desarrollo'?'var(--am)':'var(--rd)';
+        const tonoLabel=r.tono==='reconocimiento'?'Reconocimiento':r.tono==='desarrollo'?'En desarrollo':'Plan de apoyo';
+        retroHtml+='<div style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--bd);">';
+        retroHtml+='<div style="font-size:10px;font-weight:600;color:var(--t2);text-transform:uppercase;margin-bottom:8px;">📝 Retroalimentación</div>';
+        retroHtml+='<div style="background:'+tonoBg+';border-left:3px solid '+tonoColor+';border-radius:var(--rs);padding:8px 12px;margin-bottom:8px;font-size:12px;color:var(--t2);">';
+        retroHtml+='<span style="font-size:10px;font-weight:600;color:'+tonoColor+';text-transform:uppercase;margin-right:6px;">'+tonoLabel+'</span>';
+        if(r.criterios_reforzar&&r.criterios_reforzar.length){
+          retroHtml+='<div style="margin-top:6px;">Puntos a reforzar: <b>'+r.criterios_reforzar.map(c=>c.nombre+' ('+c.score+'%)').join(' · ')+'</b></div>';
+        }
+        retroHtml+='</div>';
+        if(r.tableros_sugeridos&&r.tableros_sugeridos.length){
+          retroHtml+='<div style="font-size:11px;color:var(--t2);margin-bottom:4px;"><b>Tableros a repasar:</b> '+r.tableros_sugeridos.join(', ')+'</div>';
+        }
+        if(r.comentarios_evaluador){
+          retroHtml+='<div style="font-size:12px;color:var(--t2);background:var(--bg);border-radius:4px;padding:7px 10px;margin-top:4px;border-left:2px solid var(--acc);">'+r.comentarios_evaluador+'</div>';
+        }
+        retroHtml+='</div>';
+      }
+      h+='<div style="background:var(--surface);border:1px solid var(--bd);border-left:3px solid '+sc(e.score)+';border-radius:var(--rs);padding:12px 14px;margin-bottom:8px;"><div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;"><span style="font-size:10px;font-weight:600;color:'+sc(e.score)+';text-transform:uppercase;">📊 Evaluación</span><span style="font-size:12px;font-weight:500;">'+(e.fecha?e.fecha.split('T')[0]:mL(e.mes))+'</span><span style="font-size:11px;color:var(--t3);">'+lytLbl+'</span><span style="font-size:13px;font-weight:600;color:'+sc(e.score)+';margin-left:auto;">'+e.score+'/100</span><span style="font-size:11px;color:var(--t3);">Evaluador: <b>'+(e.evaluador||'—')+'</b></span>'+delBtn+'</div>'+(e.notas?'<div style="font-size:12px;color:var(--t);">'+e.notas+'</div>':'<div style="font-size:11px;color:var(--t3);font-style:italic;">Sin notas</div>')+detalleHtml+retroHtml+'</div>';
     }
   });}
   document.getElementById('ac-hist-list').innerHTML=h;
