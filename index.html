@@ -2581,7 +2581,7 @@ function exportActividad(){
 
     const csv='RESUMEN\n'+toCSV(rowsRes)+'\n\nHISTORIAL COMPLETO\n'+toCSV(rowsHist);
     const fn='Actividad_Ejecutivos_'+new Date().toISOString().split('T')[0]+'.csv';
-    descargarArchivo(csv,fn,'text/csv;charset=utf-8;');
+    descargarArchivo('\uFEFF'+csv,fn,'text/csv;charset=utf-8;');
   }catch(e){console.error('exportActividad:',e);alert('Error al exportar: '+e.message);}
 }
 
@@ -3267,7 +3267,7 @@ function exportEstrategico(){
     }
     // Fallback CSV
     const csv=rows.map(r=>r.map(v=>'"'+String(v||'').replace(/"/g,'""')+'"').join(',')).join('\n');
-    descargarArchivo(csv,'Estrategico_'+new Date().toISOString().split('T')[0]+'.csv','text/csv;charset=utf-8;');
+    descargarArchivo('\uFEFF'+csv,'Estrategico_'+new Date().toISOString().split('T')[0]+'.csv','text/csv;charset=utf-8;');
   }catch(e){console.error('exportEstrategico:',e);alert('Error al exportar: '+e.message);}
 }
 
@@ -3300,7 +3300,7 @@ function exportCobertura(){
     // Exportar CSV (igual que Exportar Actividad — sin XLSX para evitar charCodeAt)
     const toCSV=arr=>arr.map(r=>r.map(v=>'"'+String(v===null||v===undefined?'':v).replace(/"/g,'""')+'"').join(',')).join('\n');
     const fn='Cobertura_Evaluaciones_'+new Date().toISOString().split('T')[0]+'.csv';
-    descargarArchivo(toCSV(rows),fn,'text/csv;charset=utf-8;');
+    descargarArchivo('\uFEFF'+toCSV(rows),fn,'text/csv;charset=utf-8;');
   }catch(e){console.error('exportCobertura:',e);alert('Error al exportar: '+e.message);}
 }
 
