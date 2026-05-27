@@ -3149,14 +3149,24 @@ function renderHeatmap(ejs,evs){
     h+='<tr><td style="padding:6px 10px;border-bottom:1px solid var(--bd);font-weight:500;font-size:11px;">'+of.nombre+'</td>';
     let totAvg=0,totCnt=0;
     DB.criterios.forEach((c,ci)=>{
-      const arr=oEvs.map(e=>e.criterios?e.criterios[ci]:null).filter(v=>v!==null);
+      const arr=oEvs.map(e=>{
+        if(!e.criterios)return null;
+        // Si todos los criterios son 0 pero el score total es >0 = eval importada sin desglose → ignorar criterios individuales
+        const sumCrit=e.criterios.reduce((s,v)=>s+(v||0),0);
+        if(sumCrit===0&&e.score>0)return null;
+        return e.criterios[ci];
+      }).filter(v=>v!==null);
       if(!arr.length){h+='<td style="padding:6px 8px;border-bottom:1px solid var(--bd);text-align:center;color:var(--t3);">—</td>';return;}
       const a=Math.round(arr.reduce((s,v)=>s+v,0)/arr.length);
       totAvg+=a;totCnt++;
       const alpha=Math.min(0.85,0.25+a/120);
       h+='<td style="padding:6px 8px;border-bottom:1px solid var(--bd);text-align:center;background:rgba('+(a>=80?'26,122,82':a>=60?'138,92,0':'165,42,42')+','+alpha+');color:#fff;font-weight:600;">'+a+'</td>';
     });
-    const oAvg=totCnt?Math.round(totAvg/totCnt):0;
+    // Prom.: combina promedios de criterios + scores totales de evals sin desglose
+    const scoresConDesglose=oEvs.filter(e=>{if(!e.criterios)return false;const s=e.criterios.reduce((t,v)=>t+(v||0),0);return!(s===0&&e.score>0);}).map(e=>e.score);
+    const scoresSinDesglose=oEvs.filter(e=>{if(!e.criterios)return true;const s=e.criterios.reduce((t,v)=>t+(v||0),0);return s===0&&e.score>0;}).map(e=>e.score);
+    const allScores=[...scoresConDesglose,...scoresSinDesglose];
+    const oAvg=allScores.length?Math.round(allScores.reduce((s,v)=>s+v,0)/allScores.length):(totCnt?Math.round(totAvg/totCnt):0);
     h+='<td style="padding:6px 8px;border-bottom:1px solid var(--bd);text-align:center;font-weight:700;color:'+sc(oAvg)+'">'+(oAvg||'—')+'</td></tr>';
   });
   h+='</tbody></table>';
