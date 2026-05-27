@@ -576,6 +576,7 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFAF8;}
       <div style="margin-left:auto;display:flex;gap:6px;">
         <button class="btn-tool" onclick="clearEsFilters()">🗑 Limpiar</button>
         <button class="btn-tool" onclick="exportEstrategico()">⬇ Exportar BD filtrada</button>
+        <button class="btn-tool" onclick="exportCobertura()" style="background:var(--pu2);color:var(--pu);border-color:var(--pu);">⬇ Reporte de cobertura</button>
       </div>
     </div>
     <div class="ms-chips" id="es-chips"></div>
@@ -3268,6 +3269,39 @@ function exportEstrategico(){
     const csv=rows.map(r=>r.map(v=>'"'+String(v||'').replace(/"/g,'""')+'"').join(',')).join('\n');
     descargarArchivo(csv,'Estrategico_'+new Date().toISOString().split('T')[0]+'.csv','text/csv;charset=utf-8;');
   }catch(e){console.error('exportEstrategico:',e);alert('Error al exportar: '+e.message);}
+}
+
+function exportCobertura(){
+  try{
+    // Obtener ejecutivos filtrados (respeta filtros activos de Reporte Estratégico)
+    const ejs=typeof ejecutivosFiltrados==='function'?ejecutivosFiltrados():DB.ejecutivos;
+    // Meses filtrados (para saber en qué mes buscar la eval)
+    const mesesFiltro=(typeof MS_STATE!=='undefined'&&MS_STATE&&MS_STATE.mes&&MS_STATE.mes.length)?MS_STATE.mes:null;
+
+    const hdr=['Ejecutivo','Oficina','Fase','Responsable Seguimiento','Evaluado','Score','Mes evaluación','Layout','Evaluador','Notas evaluación'];
+    const rows=[hdr];
+
+    ejs.forEach(ej=>{
+      const of=gOf(ej.oficina);
+      // Buscar última evaluación del ejecutivo dentro del filtro de mes (o global si no hay filtro)
+      let evsEj=DB.evaluaciones.filter(e=>e.ejecutivo===ej.id&&e.guardada&&e.score!==null);
+      if(mesesFiltro)evsEj=evsEj.filter(e=>mesesFiltro.includes(e.mes));
+      // Tomar la más reciente
+      const ultEval=evsEj.sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''))[0]||null;
+      const evaluado=ultEval?'✓ Sí':'✗ No';
+      const score=ultEval?ultEval.score:'';
+      const mes=ultEval?mL(ultEval.mes):'';
+      const layout=ultEval&&(ultEval.layout||ultEval.layout_id)?'Opción '+(ultEval.layout||ultEval.layout_id):'';
+      const evaluador=ultEval?ultEval.evaluador||'':'';
+      const notas=ultEval?ultEval.notas||'':'';
+      rows.push([ej.nombre,of.nombre,ej.fase||'',ej.responsable_seguimiento||'',evaluado,score,mes,layout,evaluador,notas]);
+    });
+
+    // Exportar CSV (igual que Exportar Actividad — sin XLSX para evitar charCodeAt)
+    const toCSV=arr=>arr.map(r=>r.map(v=>'"'+String(v===null||v===undefined?'':v).replace(/"/g,'""')+'"').join(',')).join('\n');
+    const fn='Cobertura_Evaluaciones_'+new Date().toISOString().split('T')[0]+'.csv';
+    descargarArchivo(toCSV(rows),fn,'text/csv;charset=utf-8;');
+  }catch(e){console.error('exportCobertura:',e);alert('Error al exportar: '+e.message);}
 }
 
 function populateComparativoSelects(){
