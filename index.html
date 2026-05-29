@@ -202,18 +202,15 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFAF8;}
 .sw input:checked + .sl-x{background:var(--gn);}
 .sw input:checked + .sl-x::before{transform:translateX(16px);}
 @media print{
-  body.printing *{display:none!important;}
-  body.printing #vw-estrategico,
-  body.printing #vw-estrategico *{display:revert!important;}
-  body.printing .btn-tool,
-  body.printing .pdf-btns,
-  body.printing .ms-wrap,
-  body.printing .btn-limpiar,
-  body.printing #hm-of-filter,
-  body.printing .fr{display:none!important;}
-  body.printing #vw-estrategico{position:fixed!important;top:0!important;left:0!important;width:100%!important;z-index:9999!important;background:#fff!important;padding:16px!important;overflow:visible!important;}
-  #print-header{display:none;}
-  body.printing #print-header{display:block!important;font-size:13px;font-weight:600;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #ccc;}
+  .no-print, nav, .ntb-wrap, .pdf-btns, .ms-wrap, .btn-limpiar,
+  #hm-of-filter, .fr, .btn, .btn-tool, .btn-p, .btn-sm,
+  #print-header ~ * + .no-print { display:none!important; }
+  #vw-dashboard, #vw-evaluar, #vw-acomp, #vw-historial,
+  #vw-admin, #vw-usuarios, #vw-evolucion,
+  .auth-screen, #auth-wrap { display:none!important; }
+  #vw-estrategico { display:block!important; }
+  body, #app { background:white!important; }
+  #print-header { display:block!important; font-size:12px; font-weight:600; margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid #ccc; }
 }
 </style>
 </head>
@@ -304,7 +301,7 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFAF8;}
 ══════════════════════════════════════════════════════════ -->
 <div id="app" style="display:none;">
 
-<nav class="nav">
+<nav class="nav no-print">
   <div class="nb">Disciplina <span>Comercial</span></div>
   <div class="nt">
     <button class="ntb active" id="nb-dashboard" onclick="sv('dashboard')">🏠 Home</button>
@@ -3446,12 +3443,8 @@ function rHistComentarios(){
 
 function _printView(titulo){
   document.getElementById('print-header').textContent='Disciplina Comercial — '+titulo+' · '+new Date().toLocaleDateString('es-MX');
-  document.body.classList.add('printing');
-  setTimeout(()=>{
-    window.print();
-    document.body.classList.remove('printing');
-    document.getElementById('print-header').textContent='';
-  },300);
+  window.print();
+  document.getElementById('print-header').textContent='';
 }
 
 function exportPDF(modo,id){
