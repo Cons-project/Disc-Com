@@ -201,6 +201,20 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFAF8;}
 .sw .sl-x::before{content:'';position:absolute;height:14px;width:14px;left:3px;bottom:3px;background:white;border-radius:50%;transition:.2s;}
 .sw input:checked + .sl-x{background:var(--gn);}
 .sw input:checked + .sl-x::before{transform:translateX(16px);}
+@media print{
+  body.printing *{display:none!important;}
+  body.printing #vw-estrategico,
+  body.printing #vw-estrategico *{display:revert!important;}
+  body.printing .btn-tool,
+  body.printing .pdf-btns,
+  body.printing .ms-wrap,
+  body.printing .btn-limpiar,
+  body.printing #hm-of-filter,
+  body.printing .fr{display:none!important;}
+  body.printing #vw-estrategico{position:fixed!important;top:0!important;left:0!important;width:100%!important;z-index:9999!important;background:#fff!important;padding:16px!important;overflow:visible!important;}
+  #print-header{display:none;}
+  body.printing #print-header{display:block!important;font-size:13px;font-weight:600;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #ccc;}
+}
 </style>
 </head>
 <body>
@@ -452,6 +466,18 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFAF8;}
   </div>
 </div>
 
+<!-- Modal selector PDF -->
+<div id="pdf-sel-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1200;align-items:center;justify-content:center;">
+  <div style="background:var(--surface);border-radius:var(--r);padding:24px;max-width:420px;width:90%;">
+    <div style="font-size:16px;font-weight:600;margin-bottom:16px;" id="pdf-sel-title">Seleccionar</div>
+    <div id="pdf-sel-content"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button class="btn" onclick="document.getElementById('pdf-sel-modal').style.display='none'">Cancelar</button>
+      <button class="btn btn-p" onclick="confirmarPdfSel()">📄 Generar PDF</button>
+    </div>
+  </div>
+</div>
+
 <!-- Evolución -->
 <div class="vw" id="vw-evolución">
   <div class="pt">Evolución por ejecutivo</div><div class="ps">Historial de scores mes a mes</div>
@@ -584,6 +610,7 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFAF8;}
 
   <!-- ─── SUB-VIEW: RESUMEN ────────────────────────────────── -->
   <div class="subview active" id="subview-resumen">
+    <div id="print-header"></div>
     <div class="sr" id="es-kpis" style="margin-bottom:16px;"></div>
     <div style="background:var(--surface);border:1px solid var(--bd);border-radius:var(--r);padding:16px;margin-bottom:16px;">
       <div style="font-size:13px;font-weight:600;color:var(--t2);margin-bottom:12px;">Promedio por criterio</div>
@@ -591,9 +618,11 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFAF8;}
     </div>
 
     <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
-      <button class="btn-tool" onclick="exportPDF('global')">📄 PDF — Vista global filtrada</button>
-      <button class="btn-tool" onclick="abrirPdfEjecutivo()">📄 PDF — Por ejecutivo</button>
-      <button class="btn-tool" onclick="abrirPdfOficina()">📄 PDF — Por oficina</button>
+      <div class="pdf-btns" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
+        <button class="btn-tool" onclick="exportPDF('global')">📄 PDF — Vista global filtrada</button>
+        <button class="btn-tool" onclick="abrirPdfOficina()">📄 PDF — Por oficina</button>
+        <button class="btn-tool" onclick="abrirPdfEjecutivo()">📄 PDF — Por ejecutivo</button>
+      </div>
     </div>
 
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:14px;margin-bottom:16px;">
@@ -2944,7 +2973,7 @@ function buildMS(id,options){
     h+='<span>'+opt.label+'</span></div>';
   });
   h+='</div>';
-  h+='<div class="ms-actions"><button onclick="msSelectAll(\''+id+'\')">Todos</button><button onclick="msClear(\''+id+'\')">Ninguno</button></div>';
+  h+='<div class="ms-actions"><button onclick="msSelectAll(\''+id+'\',event)">Todos</button><button onclick="msClear(\''+id+'\',event)">Ninguno</button></div>';
   h+='</div>';
   wrap.innerHTML=h;
 }
@@ -2957,14 +2986,10 @@ function toggleMSOpt(id,val,e){
   e.stopPropagation();
   const arr=MS_STATE[id];const i=arr.indexOf(val);
   if(i>=0)arr.splice(i,1);else arr.push(val);
-  rebuildMS();
-  // Re-abrir el dropdown que estaba abierto antes del rebuild
-  const drop=document.getElementById('ms-drop-'+id);
-  if(drop)drop.classList.add('open');
-  onEsFilterChange(id);
+  onEsFilterChange(id,id);
 }
-function msSelectAll(id){MS_STATE[id]=ES_OPTIONS[id].map(o=>o.value);rebuildMS();const d=document.getElementById('ms-drop-'+id);if(d)d.classList.add('open');onEsFilterChange(id);}
-function msClear(id){MS_STATE[id]=[];rebuildMS();const d=document.getElementById('ms-drop-'+id);if(d)d.classList.add('open');onEsFilterChange(id);}
+function msSelectAll(id,e){if(e)e.stopPropagation();MS_STATE[id]=ES_OPTIONS[id].map(o=>o.value);onEsFilterChange(id,id);}
+function msClear(id,e){if(e)e.stopPropagation();MS_STATE[id]=[];onEsFilterChange(id,id);}
 function filterMS(id,q){
   const qn=normalize(q);
   document.querySelectorAll('#ms-list-'+id+' .ms-opt').forEach(el=>{
@@ -2973,13 +2998,14 @@ function filterMS(id,q){
 }
 document.addEventListener('click',function(){document.querySelectorAll('.ms-drop.open').forEach(d=>d.classList.remove('open'));});
 
-function rebuildMS(){
+function rebuildMS(keepOpenId=null){
   buildMS('mes',ES_OPTIONS.mes);
   buildMS('oficina',ES_OPTIONS.oficina);
   buildMS('ejecutivo',ES_OPTIONS.ejecutivo);
   buildMS('fase',ES_OPTIONS.fase);
   buildMS('responsable',ES_OPTIONS.responsable);
   renderChips();
+  if(keepOpenId){const d=document.getElementById('ms-drop-'+keepOpenId);if(d)d.classList.add('open');}
 }
 function renderChips(){
   let h='';
@@ -2992,16 +3018,13 @@ function renderChips(){
   });
   document.getElementById('es-chips').innerHTML=h;
 }
-function removeChip(k,v){const arr=MS_STATE[k];const i=arr.indexOf(v);if(i>=0)arr.splice(i,1);rebuildMS();onEsFilterChange(k);}
+function removeChip(k,v){const arr=MS_STATE[k];const i=arr.indexOf(v);if(i>=0)arr.splice(i,1);onEsFilterChange(k,null);}
 
-function onEsFilterChange(changedKey){
+function onEsFilterChange(changedKey,keepOpenId=null){
   if(changedKey==='oficina'||changedKey==='fase'||changedKey==='responsable'){
-    // Preservar qué dropdown está abierto antes del rebuild
-    const openDrop=document.querySelector('.ms-drop.open');
-    const openId=openDrop?openDrop.id.replace('ms-drop-',''):null;
-    updateEjecutivoOptions();rebuildMS();
-    if(openId){const d=document.getElementById('ms-drop-'+openId);if(d)d.classList.add('open');}
+    updateEjecutivoOptions();
   }
+  rebuildMS(keepOpenId);
   rEstrategico();rEvoChart();
   if(document.getElementById('subview-comparativo').classList.contains('active'))rComparativo();
 }
@@ -3029,7 +3052,7 @@ function ejecutivosFiltrados(){
 
 function clearEsFilters(){
   MS_STATE.mes=[];MS_STATE.oficina=[];MS_STATE.ejecutivo=[];MS_STATE.fase=[];MS_STATE.responsable=[];
-  updateEjecutivoOptions();rebuildMS();rEstrategico();rEvoChart();
+  updateEjecutivoOptions();rebuildMS(null);rEstrategico();rEvoChart();
   if(document.getElementById('subview-comparativo').classList.contains('active'))rComparativo();
 }
 
@@ -3421,25 +3444,83 @@ function rHistComentarios(){
   document.getElementById('hc-timeline').innerHTML=h;
 }
 
-function abrirPdfEjecutivo(){
-  const ejs=ejecutivosFiltrados();
-  if(!ejs.length){alert('No hay ejecutivos en el filtro actual');return;}
-  const opciones=ejs.slice().sort((a,b)=>a.nombre.localeCompare(b.nombre)).slice(0,30).map(e=>e.nombre).join('\n');
-  const nombre=prompt('Escribe el nombre del ejecutivo (primeros 30 visibles):\n\n'+opciones);
-  if(!nombre)return;
-  const ej=ejs.find(e=>normalize(e.nombre).includes(normalize(nombre)));
-  if(!ej){alert('Ejecutivo no encontrado en el filtro');return;}
-  exportPDF('ejecutivo',ej.id);
+function _printView(titulo){
+  document.getElementById('print-header').textContent='Disciplina Comercial — '+titulo+' · '+new Date().toLocaleDateString('es-MX');
+  document.body.classList.add('printing');
+  setTimeout(()=>{
+    window.print();
+    document.body.classList.remove('printing');
+    document.getElementById('print-header').textContent='';
+  },300);
 }
+
+function exportPDF(modo,id){
+  if(modo==='global'){
+    const filtros=[];
+    if(MS_STATE.mes.length)filtros.push(MS_STATE.mes.map(m=>mL(m)).join(', '));
+    if(MS_STATE.oficina.length)filtros.push(DB.oficinas.filter(o=>MS_STATE.oficina.includes(o.id)).map(o=>o.nombre).join(', '));
+    if(MS_STATE.fase.length)filtros.push(MS_STATE.fase.join(', '));
+    const titulo='Reporte Estratégico'+(filtros.length?' — '+filtros.join(' | '):'');
+    _printView(titulo);
+  }else if(modo==='ejecutivo'){
+    const ej=gEj(id);
+    // Guardar filtros actuales
+    const prev={mes:[...MS_STATE.mes],oficina:[...MS_STATE.oficina],ejecutivo:[...MS_STATE.ejecutivo],fase:[...MS_STATE.fase],responsable:[...MS_STATE.responsable]};
+    MS_STATE.ejecutivo=[id];
+    rebuildMS();rEstrategico();rEvoChart();
+    setTimeout(()=>{
+      _printView('Ejecutivo: '+ej.nombre+' — '+gOf(ej.oficina).nombre);
+      setTimeout(()=>{
+        Object.assign(MS_STATE,prev);
+        rebuildMS();rEstrategico();rEvoChart();
+      },500);
+    },300);
+  }else if(modo==='oficina'){
+    const of=gOf(id);
+    const prev={mes:[...MS_STATE.mes],oficina:[...MS_STATE.oficina],ejecutivo:[...MS_STATE.ejecutivo],fase:[...MS_STATE.fase],responsable:[...MS_STATE.responsable]};
+    MS_STATE.oficina=[id];MS_STATE.ejecutivo=[];
+    rebuildMS();rEstrategico();rEvoChart();
+    setTimeout(()=>{
+      _printView('Oficina: '+of.nombre);
+      setTimeout(()=>{
+        Object.assign(MS_STATE,prev);
+        rebuildMS();rEstrategico();rEvoChart();
+      },500);
+    },300);
+  }
+}
+
+function abrirPdfEjecutivo(){
+  const ejs=ejecutivosFiltrados().slice().sort((a,b)=>a.nombre.localeCompare(b.nombre));
+  if(!ejs.length){alert('No hay ejecutivos en el filtro actual');return;}
+  let h='<select id="pdf-ej-sel" class="sel" style="width:100%;margin-bottom:12px;"><option value="">Selecciona un ejecutivo...</option>';
+  ejs.forEach(e=>{h+='<option value="'+e.id+'">'+e.nombre+' — '+gOf(e.oficina).nombre+'</option>';});
+  h+='</select>';
+  document.getElementById('pdf-sel-content').innerHTML=h;
+  document.getElementById('pdf-sel-title').textContent='PDF por ejecutivo';
+  document.getElementById('pdf-sel-modal').dataset.modo='ejecutivo';
+  document.getElementById('pdf-sel-modal').style.display='flex';
+}
+
 function abrirPdfOficina(){
   const ofIds=[...new Set(ejecutivosFiltrados().map(e=>e.oficina))];
   if(!ofIds.length){alert('No hay oficinas en el filtro actual');return;}
-  const ofNames=ofIds.map(id=>gOf(id).nombre).sort();
-  const nombre=prompt('Escribe el nombre de la oficina:\n\n'+ofNames.slice(0,30).join('\n'));
-  if(!nombre)return;
-  const of=DB.oficinas.find(o=>normalize(o.nombre).includes(normalize(nombre)));
-  if(!of){alert('Oficina no encontrada');return;}
-  exportPDF('oficina',of.id);
+  const ofs=ofIds.map(id=>gOf(id)).sort((a,b)=>a.nombre.localeCompare(b.nombre));
+  let h='<select id="pdf-ej-sel" class="sel" style="width:100%;margin-bottom:12px;"><option value="">Selecciona una oficina...</option>';
+  ofs.forEach(o=>{h+='<option value="'+o.id+'">'+o.nombre+'</option>';});
+  h+='</select>';
+  document.getElementById('pdf-sel-content').innerHTML=h;
+  document.getElementById('pdf-sel-title').textContent='PDF por oficina';
+  document.getElementById('pdf-sel-modal').dataset.modo='oficina';
+  document.getElementById('pdf-sel-modal').style.display='flex';
+}
+
+function confirmarPdfSel(){
+  const sel=document.getElementById('pdf-ej-sel');
+  if(!sel||!sel.value){alert('Selecciona una opción primero');return;}
+  const modo=document.getElementById('pdf-sel-modal').dataset.modo;
+  document.getElementById('pdf-sel-modal').style.display='none';
+  exportPDF(modo,sel.value);
 }
 
 function exportPDF(modo,id){
