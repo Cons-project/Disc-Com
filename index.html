@@ -2996,7 +2996,11 @@ function removeChip(k,v){const arr=MS_STATE[k];const i=arr.indexOf(v);if(i>=0)ar
 
 function onEsFilterChange(changedKey){
   if(changedKey==='oficina'||changedKey==='fase'||changedKey==='responsable'){
+    // Preservar qué dropdown está abierto antes del rebuild
+    const openDrop=document.querySelector('.ms-drop.open');
+    const openId=openDrop?openDrop.id.replace('ms-drop-',''):null;
     updateEjecutivoOptions();rebuildMS();
+    if(openId){const d=document.getElementById('ms-drop-'+openId);if(d)d.classList.add('open');}
   }
   rEstrategico();rEvoChart();
   if(document.getElementById('subview-comparativo').classList.contains('active'))rComparativo();
