@@ -2957,10 +2957,14 @@ function toggleMSOpt(id,val,e){
   e.stopPropagation();
   const arr=MS_STATE[id];const i=arr.indexOf(val);
   if(i>=0)arr.splice(i,1);else arr.push(val);
-  rebuildMS();onEsFilterChange(id);
+  rebuildMS();
+  // Re-abrir el dropdown que estaba abierto antes del rebuild
+  const drop=document.getElementById('ms-drop-'+id);
+  if(drop)drop.classList.add('open');
+  onEsFilterChange(id);
 }
-function msSelectAll(id){MS_STATE[id]=ES_OPTIONS[id].map(o=>o.value);rebuildMS();onEsFilterChange(id);}
-function msClear(id){MS_STATE[id]=[];rebuildMS();onEsFilterChange(id);}
+function msSelectAll(id){MS_STATE[id]=ES_OPTIONS[id].map(o=>o.value);rebuildMS();const d=document.getElementById('ms-drop-'+id);if(d)d.classList.add('open');onEsFilterChange(id);}
+function msClear(id){MS_STATE[id]=[];rebuildMS();const d=document.getElementById('ms-drop-'+id);if(d)d.classList.add('open');onEsFilterChange(id);}
 function filterMS(id,q){
   const qn=normalize(q);
   document.querySelectorAll('#ms-list-'+id+' .ms-opt').forEach(el=>{
