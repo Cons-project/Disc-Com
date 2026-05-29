@@ -585,10 +585,6 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFAF8;}
   <!-- ─── SUB-VIEW: RESUMEN ────────────────────────────────── -->
   <div class="subview active" id="subview-resumen">
     <div class="sr" id="es-kpis" style="margin-bottom:16px;"></div>
-    <div style="background:var(--surface);border:1px solid var(--bd);border-radius:var(--r);padding:16px;margin-bottom:16px;">
-      <div style="font-size:13px;font-weight:600;color:var(--t2);margin-bottom:12px;">Promedio por criterio</div>
-      <div id="es-crit-avgs" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"></div>
-    </div>
 
     <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
       <button class="btn-tool" onclick="exportPDF('global')">📄 PDF — Vista global filtrada</button>
@@ -3085,48 +3081,22 @@ function rEstrategico(){
   const at=ejAvgs.filter(s=>s<60).length;
   const pctSol=evd?Math.round(sol/evd*100):0;
   const pctAt=evd?Math.round(at/evd*100):0;
-  // ── Categorías por score promedio del ejecutivo en el periodo ──
-  const sol=ejAvgs.filter(s=>s>80).length;
-  const inter=ejAvgs.filter(s=>s>=50&&s<=80).length;
-  const at=ejAvgs.filter(s=>s<50).length;
-  const pctSol=evd?Math.round(sol/evd*100):0;
-  const pctInter=evd?Math.round(inter/evd*100):0;
-  const pctAt=evd?Math.round(at/evd*100):0;
-
-  const periodoLabel=mesesSel.length===1?mL(mesesSel[0]):mesesSel.length+' meses';
+  let critDebil={nombre:'—',avg:100};
+  DB.criterios.forEach((c,ci)=>{
+    const arr=evs.map(e=>e.criterios?e.criterios[ci]:null).filter(v=>v!==null);
+    if(!arr.length)return;
+    const a=Math.round(arr.reduce((s,v)=>s+v,0)/arr.length);
+    if(a<critDebil.avg)critDebil={nombre:c.nombre,avg:a};
+  });
   const arrow=delta>0?'<span style="color:var(--gn);">↑ +'+delta+'</span>':delta<0?'<span style="color:var(--rd);">↓ '+delta+'</span>':'<span style="color:var(--t3);">→ 0</span>';
-
+  const periodoLabel=mesesSel.length===1?mL(mesesSel[0]):mesesSel.length+' meses';
   document.getElementById('es-kpis').innerHTML=
     '<div class="sc"><div class="sv">'+cob+'%</div><div class="sl">Cobertura</div><div style="font-size:10px;color:var(--t3);margin-top:3px;">'+evd+' de '+total+'</div></div>'+
     '<div class="sc'+(avg>=80?' g':avg>=60?' a':avg>0?' r':'')+'" ><div class="sv">'+(avg||'—')+'</div><div class="sl">Score · '+periodoLabel+'</div><div style="font-size:10px;margin-top:3px;">'+arrow+'</div></div>'+
-    '<div class="sc g"><div class="sv">'+pctSol+'%</div><div class="sl">Conocimiento sólido</div><div style="font-size:10px;color:var(--t3);margin-top:3px;">'+sol+' ejec. (>80 pts)</div></div>'+
-    '<div class="sc a"><div class="sv">'+pctInter+'%</div><div class="sl">Conocimiento intermedio</div><div style="font-size:10px;color:var(--t3);margin-top:3px;">'+inter+' ejec. (50–80 pts)</div></div>'+
-    '<div class="sc r"><div class="sv">'+pctAt+'%</div><div class="sl">Requieren atención</div><div style="font-size:10px;color:var(--t3);margin-top:3px;">'+at+' ejec. (<50 pts)</div></div>';
-
-  // ── Promedio por criterio ──
-  const critAvgs=DB.criterios.map((c,ci)=>{
-    const arr=evs.map(e=>{
-      if(!e.criterios)return null;
-      const sum=e.criterios.reduce((s,v)=>s+(v||0),0);
-      if(sum===0&&e.score>0)return null;
-      return e.criterios[ci];
-    }).filter(v=>v!==null&&v!==undefined);
-    return{nombre:c.nombre,avg:arr.length?Math.round(arr.reduce((s,v)=>s+v,0)/arr.length):null};
-  });
-  const critHtml=critAvgs.map((c,i)=>{
-    const val=c.avg!==null?c.avg+'%':'—';
-    const col=c.avg===null?'var(--t3)':c.avg>80?'var(--gn)':c.avg>=50?'var(--am)':'var(--rd)';
-    const bg=c.avg===null?'var(--bg)':c.avg>80?'var(--gn2)':c.avg>=50?'var(--am2)':'#FEF0F0';
-    const barW=c.avg!==null?c.avg:0;
-    return '<div style="background:'+bg+';border:1px solid var(--bd);border-radius:var(--rs);padding:10px 14px;display:flex;align-items:center;gap:12px;">'+
-      '<span style="font-size:11px;font-weight:600;color:var(--t3);min-width:16px;">'+(i+1)+'</span>'+
-      '<div style="flex:1;"><div style="font-size:12px;font-weight:500;color:var(--t);margin-bottom:5px;">'+c.nombre+'</div>'+
-      '<div style="background:var(--bd);border-radius:4px;height:6px;width:100%;"><div style="background:'+col+';height:6px;border-radius:4px;width:'+barW+'%;transition:width .3s;"></div></div></div>'+
-      '<span style="font-size:16px;font-weight:600;color:'+col+';min-width:40px;text-align:right;">'+val+'</span>'+
-      '</div>';
-  }).join('');
-  const critWrap=document.getElementById('es-crit-avgs');
-  if(critWrap)critWrap.innerHTML=critHtml;
+    '<div class="sc g"><div class="sv">'+pctSol+'%</div><div class="sl">Sólidos (≥80)</div><div style="font-size:10px;color:var(--t3);margin-top:3px;">'+sol+' ejecutivos</div></div>'+
+    '<div class="sc r"><div class="sv">'+pctAt+'%</div><div class="sl">Atención (<60)</div><div style="font-size:10px;color:var(--t3);margin-top:3px;">'+at+' ejecutivos</div></div>'+
+    '<div class="sc'+(delta>=0?' g':' r')+'"><div class="sv">'+(delta>=0?'+':'')+delta+'</div><div class="sl">Δ vs '+mL(mesPrev)+'</div></div>'+
+    '<div class="sc a"><div class="sv" style="font-size:14px;line-height:1.3;">'+critDebil.avg+'%</div><div class="sl" style="font-size:10px;">Criterio más débil</div><div style="font-size:10px;color:var(--t3);margin-top:3px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+critDebil.nombre+'</div></div>';
   // Ranking: ÚLTIMA evaluación de cada ejecutivo en el periodo (más reciente por fecha)
   const ultPorEj={};
   evs.forEach(e=>{
@@ -3179,24 +3149,14 @@ function renderHeatmap(ejs,evs){
     h+='<tr><td style="padding:6px 10px;border-bottom:1px solid var(--bd);font-weight:500;font-size:11px;">'+of.nombre+'</td>';
     let totAvg=0,totCnt=0;
     DB.criterios.forEach((c,ci)=>{
-      const arr=oEvs.map(e=>{
-        if(!e.criterios)return null;
-        // Si todos los criterios son 0 pero el score total es >0 = eval importada sin desglose → ignorar criterios individuales
-        const sumCrit=e.criterios.reduce((s,v)=>s+(v||0),0);
-        if(sumCrit===0&&e.score>0)return null;
-        return e.criterios[ci];
-      }).filter(v=>v!==null);
+      const arr=oEvs.map(e=>e.criterios?e.criterios[ci]:null).filter(v=>v!==null);
       if(!arr.length){h+='<td style="padding:6px 8px;border-bottom:1px solid var(--bd);text-align:center;color:var(--t3);">—</td>';return;}
       const a=Math.round(arr.reduce((s,v)=>s+v,0)/arr.length);
       totAvg+=a;totCnt++;
       const alpha=Math.min(0.85,0.25+a/120);
       h+='<td style="padding:6px 8px;border-bottom:1px solid var(--bd);text-align:center;background:rgba('+(a>=80?'26,122,82':a>=60?'138,92,0':'165,42,42')+','+alpha+');color:#fff;font-weight:600;">'+a+'</td>';
     });
-    // Prom.: combina promedios de criterios + scores totales de evals sin desglose
-    const scoresConDesglose=oEvs.filter(e=>{if(!e.criterios)return false;const s=e.criterios.reduce((t,v)=>t+(v||0),0);return!(s===0&&e.score>0);}).map(e=>e.score);
-    const scoresSinDesglose=oEvs.filter(e=>{if(!e.criterios)return true;const s=e.criterios.reduce((t,v)=>t+(v||0),0);return s===0&&e.score>0;}).map(e=>e.score);
-    const allScores=[...scoresConDesglose,...scoresSinDesglose];
-    const oAvg=allScores.length?Math.round(allScores.reduce((s,v)=>s+v,0)/allScores.length):(totCnt?Math.round(totAvg/totCnt):0);
+    const oAvg=totCnt?Math.round(totAvg/totCnt):0;
     h+='<td style="padding:6px 8px;border-bottom:1px solid var(--bd);text-align:center;font-weight:700;color:'+sc(oAvg)+'">'+(oAvg||'—')+'</td></tr>';
   });
   h+='</tbody></table>';
