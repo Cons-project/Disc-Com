@@ -516,6 +516,7 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFAF8;}
       </div>
       <div><label style="font-size:12px;color:var(--t2);display:block;margin-bottom:6px;">Fecha</label><input type="date" class="inp" id="ac-fecha"></div>
     </div>
+    <!-- Compromiso anterior -->
     <div id="ac-prev-wrap" style="display:none;margin-top:14px;background:var(--bg);border-radius:var(--rs);padding:12px 14px;">
       <div style="font-size:12px;color:var(--t2);margin-bottom:8px;font-weight:500;">Compromiso de la sesión anterior</div>
       <div style="font-size:13px;color:var(--t);margin-bottom:10px;" id="ac-prev-texto">—</div>
@@ -525,12 +526,63 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFAF8;}
         <button class="btn btn-sm" id="ac-no" onclick="acSetCumplio(false)" style="flex:1;">No</button>
       </div>
     </div>
-    <div style="margin-top:14px;"><label style="font-size:12px;color:var(--t2);display:block;margin-bottom:6px;">Compromiso de esta sesión</label>
-      <input class="inp" id="ac-compromiso" placeholder="Específico, con nombre de agente y fecha si aplica..." style="width:100%;"></div>
-    <div style="margin-top:10px;"><label style="font-size:12px;color:var(--t2);display:block;margin-bottom:6px;">Notas (opcional)</label>
-      <input class="inp" id="ac-notas" placeholder="Observaciones de la sesión..." style="width:100%;"></div>
+    <!-- Se revisó en sesión -->
+    <div style="margin-top:14px;">
+      <label style="font-size:12px;color:var(--t2);display:block;margin-bottom:8px;font-weight:500;">✅ Se revisó en sesión</label>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;" id="chips-revisado"></div>
+    </div>
+    <!-- Se debe fortalecer -->
+    <div style="margin-top:12px;">
+      <label style="font-size:12px;color:var(--t2);display:block;margin-bottom:8px;font-weight:500;">⚠️ Se debe fortalecer</label>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;" id="chips-fortalecer"></div>
+    </div>
+    <!-- Compromisos -->
+    <div style="margin-top:14px;">
+      <label style="font-size:12px;color:var(--t2);display:block;margin-bottom:6px;">Compromisos</label>
+      <textarea class="inp" id="ac-compromiso" placeholder="Compromisos específicos, con nombre de agente y fecha si aplica..." style="width:100%;font-family:inherit;resize:vertical;" rows="2"></textarea>
+    </div>
+    <!-- Comentarios libres -->
+    <div style="margin-top:10px;">
+      <label style="font-size:12px;color:var(--t2);display:block;margin-bottom:6px;">Comentarios libres</label>
+      <textarea class="inp" id="ac-notas" placeholder="Observaciones generales de la sesión..." style="width:100%;font-family:inherit;resize:vertical;" rows="2"></textarea>
+    </div>
     <div style="display:flex;justify-content:flex-end;margin-top:14px;">
       <button class="btn btn-p" onclick="acGuardar()">Guardar sesión</button>
+    </div>
+  </div>
+
+  <!-- Seguimiento detallado -->
+  <div style="background:var(--surface);border:1px solid var(--bd);border-radius:var(--r);padding:18px;margin-bottom:20px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
+      <div style="font-size:14px;font-weight:600;">📋 Seguimiento detallado</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button class="btn btn-sm" onclick="acDetCSV()">⬇ CSV</button>
+        <button class="btn btn-sm" onclick="acDetPDF()">📄 PDF</button>
+        <button class="btn btn-sm" onclick="acDetCopiar()">📋 Copiar para chat</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:flex-end;">
+      <div><label style="font-size:11px;color:var(--t2);display:block;margin-bottom:4px;">Oficina</label>
+        <select class="sel" id="det-of" onchange="renderDetalle()"><option value="">Todas</option></select></div>
+      <div><label style="font-size:11px;color:var(--t2);display:block;margin-bottom:4px;">Desde</label>
+        <input type="date" class="inp" id="det-desde" onchange="renderDetalle()"></div>
+      <div><label style="font-size:11px;color:var(--t2);display:block;margin-bottom:4px;">Hasta</label>
+        <input type="date" class="inp" id="det-hasta" onchange="renderDetalle()"></div>
+      <button class="btn btn-sm" onclick="document.getElementById('det-of').value='';document.getElementById('det-desde').value='';document.getElementById('det-hasta').value='';renderDetalle()">Limpiar</button>
+    </div>
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead><tr style="border-bottom:1px solid var(--bd);">
+          <th style="text-align:left;padding:6px 8px;font-size:10px;color:var(--t3);font-weight:500;">FECHA</th>
+          <th style="text-align:left;padding:6px 8px;font-size:10px;color:var(--t3);font-weight:500;">EJECUTIVO</th>
+          <th style="text-align:left;padding:6px 8px;font-size:10px;color:var(--t3);font-weight:500;">OFICINA</th>
+          <th style="text-align:left;padding:6px 8px;font-size:10px;color:var(--t3);font-weight:500;">SE REVISÓ</th>
+          <th style="text-align:left;padding:6px 8px;font-size:10px;color:var(--t3);font-weight:500;">A FORTALECER</th>
+          <th style="text-align:left;padding:6px 8px;font-size:10px;color:var(--t3);font-weight:500;">COMPROMISOS</th>
+          <th style="text-align:left;padding:6px 8px;font-size:10px;color:var(--t3);font-weight:500;">COMENTARIOS</th>
+        </tr></thead>
+        <tbody id="det-tbody"></tbody>
+      </table>
     </div>
   </div>
   <div class="fr" style="margin-bottom:16px;">
@@ -2323,14 +2375,52 @@ function cM(id){document.getElementById(id).classList.remove('open');}
 // ══════════════════════════════════════════════════════════
 let acChipVal='todos';let acCumplioVal=null;
 
+const AC_TEMAS=[
+  'Uso de filtros y segmentación de información',
+  'Generación de tareas y planes de acción en Salesforce',
+  'Uso de data para decisiones',
+  'Seguimiento de agentes activos',
+  'Tuberías',
+  'Reuniones con gerente',
+  'Proyección de cierre',
+  'Plan de visitas'
+];
+let _acRevisado=[],_acFortalecer=[];
+
+function initAcChips(){
+  ['revisado','fortalecer'].forEach(tipo=>{
+    const arr=tipo==='revisado'?_acRevisado:_acFortalecer;
+    const el=document.getElementById('chips-'+tipo);
+    if(!el)return;
+    el.innerHTML=AC_TEMAS.map((t,i)=>{
+      const sel=arr.includes(i);
+      const color=tipo==='revisado'?'var(--gn)':'var(--am)';
+      const bg=tipo==='revisado'?'var(--gn2)':'var(--am2)';
+      return'<button onclick="acToggleChip(\''+tipo+'\','+i+')" style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid '+(sel?color:'var(--bd)')+';background:'+(sel?bg:'var(--bg)')+';color:'+(sel?color:'var(--t2)')+';cursor:pointer;transition:all .15s;">'+t+'</button>';
+    }).join('');
+  });
+}
+function acToggleChip(tipo,idx){
+  const arr=tipo==='revisado'?_acRevisado:_acFortalecer;
+  const i=arr.indexOf(idx);
+  if(i>=0)arr.splice(i,1);else arr.push(idx);
+  initAcChips();
+}
+
 function acInit(){
   const searchEl=document.getElementById('ac-ej-search');if(searchEl)searchEl.value='';
   document.getElementById('ac-ej').value='';
   const ofS=document.getElementById('ac-of-filter');const cur=ofS.value;
   ofS.innerHTML='<option value="">Todas las oficinas</option>';
   DB.oficinas.forEach(o=>ofS.innerHTML+='<option value="'+o.id+'"'+(o.id===cur?' selected':'')+'>'+o.nombre+'</option>');
+  // Populate det-of
+  const detOf=document.getElementById('det-of');
+  if(detOf&&detOf.options.length<=1)DB.oficinas.forEach(o=>detOf.innerHTML+='<option value="'+o.id+'">'+o.nombre+'</option>');
   document.getElementById('ac-fecha').value=new Date().toISOString().split('T')[0];
+  _acRevisado=[];_acFortalecer=[];
+  initAcChips();
   acRender();
+  renderDetalle();
 }
 function normalize(s){return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');}
 function acFilterEj(q){
@@ -2375,17 +2465,82 @@ function acGuardar(){
   const quien=SESSION?.usuario||'Sistema';
   if(!ejId)return alert('Selecciona un ejecutivo');
   if(!fecha)return alert('Selecciona la fecha');
-  if(!compromiso)return alert('Ingresa el compromiso de la sesión');
   const hist=(DB.acompañamientos||[]).filter(a=>a.ejecutivo===ejId).sort((a,b)=>b.fecha.localeCompare(a.fecha));
   const prevComp=hist.length?hist[0].compromiso_nuevo:null;
-  const obj={id:'ac'+Date.now(),ejecutivo:ejId,fecha,cumplio_anterior:hist.length?acCumplioVal:null,compromiso_anterior:prevComp,compromiso_nuevo:compromiso,notas,registrado_por:quien};
+  const revisado=_acRevisado.map(i=>AC_TEMAS[i]);
+  const fortalecer=_acFortalecer.map(i=>AC_TEMAS[i]);
+  const obj={id:'ac'+Date.now(),ejecutivo:ejId,fecha,cumplio_anterior:hist.length?acCumplioVal:null,compromiso_anterior:prevComp,compromiso_nuevo:compromiso,notas,registrado_por:quien,temas_revisado:revisado,temas_fortalecer:fortalecer};
   if(!DB.acompañamientos)DB.acompañamientos=[];
   DB.acompañamientos.push(obj);save();
-  if(USE_SUPABASE){SB.from('acompañamientos').insert({ejecutivo_id:ejId,fecha,cumplio_anterior:hist.length?acCumplioVal:null,compromiso_anterior:prevComp,compromiso_nuevo:compromiso,notas,registrado_por:quien}).then(({error})=>{if(error)console.error('AC save:',error);});}
+  if(USE_SUPABASE){SB.from('acompañamientos').insert({ejecutivo_id:ejId,fecha,cumplio_anterior:hist.length?acCumplioVal:null,compromiso_anterior:prevComp,compromiso_nuevo:compromiso,notas,registrado_por:quien,temas_revisado:revisado,temas_fortalecer:fortalecer}).then(({error})=>{if(error)console.error('AC save:',error);});}
   document.getElementById('ac-compromiso').value='';document.getElementById('ac-notas').value='';
-  document.getElementById('ac-prev-wrap').style.display='none';acCumplioVal=null;acRender();
+  document.getElementById('ac-prev-wrap').style.display='none';acCumplioVal=null;
+  _acRevisado=[];_acFortalecer=[];initAcChips();
+  acRender();renderDetalle();
   alert('Sesión registrada correctamente');
 }
+function acDetFiltrados(){
+  const of=document.getElementById('det-of')?.value||'';
+  const desde=document.getElementById('det-desde')?.value||'';
+  const hasta=document.getElementById('det-hasta')?.value||'';
+  let rows=(DB.acompañamientos||[]).slice();
+  if(of)rows=rows.filter(a=>{const ej=gEj(a.ejecutivo);return ej&&ej.oficina===of;});
+  if(desde)rows=rows.filter(a=>(a.fecha||'')>=desde);
+  if(hasta)rows=rows.filter(a=>(a.fecha||'')<=hasta);
+  return rows.sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
+}
+function renderDetalle(){
+  const rows=acDetFiltrados();
+  let h='';
+  rows.forEach(a=>{
+    const ej=gEj(a.ejecutivo);const of=ej?gOf(ej.oficina):{nombre:'—'};
+    const rev=(a.temas_revisado||[]).join(', ')||'—';
+    const fort=(a.temas_fortalecer||[]).join(', ')||'—';
+    h+='<tr style="border-bottom:0.5px solid var(--bd);">'+
+      '<td style="padding:7px 8px;white-space:nowrap;font-size:12px;">'+(a.fecha||'—')+'</td>'+
+      '<td style="padding:7px 8px;font-size:12px;font-weight:500;">'+(ej?ej.nombre:'—')+'</td>'+
+      '<td style="padding:7px 8px;font-size:11px;color:var(--t2);">'+of.nombre+'</td>'+
+      '<td style="padding:7px 8px;font-size:11px;color:var(--gn);max-width:160px;">'+rev+'</td>'+
+      '<td style="padding:7px 8px;font-size:11px;color:var(--am);max-width:160px;">'+fort+'</td>'+
+      '<td style="padding:7px 8px;font-size:11px;color:var(--t2);max-width:180px;">'+(a.compromiso_nuevo||'—')+'</td>'+
+      '<td style="padding:7px 8px;font-size:11px;color:var(--t2);max-width:180px;">'+(a.notas||'—')+'</td>'+
+      '</tr>';
+  });
+  document.getElementById('det-tbody').innerHTML=h||'<tr><td colspan="7" style="padding:16px;text-align:center;color:var(--t3);font-size:12px;">Sin registros</td></tr>';
+}
+function acDetCSV(){
+  const rows=acDetFiltrados();
+  const hdr=['Fecha','Ejecutivo','Oficina','Se revisó en sesión','Se debe fortalecer','Compromisos','Comentarios'];
+  const data=[hdr,...rows.map(a=>{
+    const ej=gEj(a.ejecutivo);const of=ej?gOf(ej.oficina):{nombre:''};
+    return[a.fecha||'',ej?ej.nombre:'',of.nombre,(a.temas_revisado||[]).join('; '),(a.temas_fortalecer||[]).join('; '),a.compromiso_nuevo||'',a.notas||''];
+  })];
+  const csv='\uFEFF'+data.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n');
+  descargarArchivo(csv,'Seguimiento_Acomp_'+new Date().toISOString().split('T')[0]+'.csv','text/csv;charset=utf-8;');
+}
+function acDetPDF(){
+  document.getElementById('print-header').textContent='Seguimiento de Acompañamiento — '+new Date().toLocaleDateString('es-MX');
+  window.print();
+  document.getElementById('print-header').textContent='';
+}
+function acDetCopiar(){
+  const rows=acDetFiltrados();
+  if(!rows.length){alert('Sin registros para copiar');return;}
+  let txt='📋 SEGUIMIENTO DE ACOMPAÑAMIENTO\n'+new Date().toLocaleDateString('es-MX')+'\n'+'─'.repeat(40)+'\n\n';
+  rows.forEach(a=>{
+    const ej=gEj(a.ejecutivo);const of=ej?gOf(ej.oficina):{nombre:''};
+    txt+='📅 '+a.fecha+' — '+(ej?ej.nombre:'')+' ('+of.nombre+')\n';
+    if((a.temas_revisado||[]).length)txt+='✅ Se revisó: '+(a.temas_revisado||[]).join(', ')+'\n';
+    if((a.temas_fortalecer||[]).length)txt+='⚠️ A fortalecer: '+(a.temas_fortalecer||[]).join(', ')+'\n';
+    if(a.compromiso_nuevo)txt+='📌 Compromiso: '+a.compromiso_nuevo+'\n';
+    if(a.notas)txt+='💬 Notas: '+a.notas+'\n';
+    txt+='\n';
+  });
+  navigator.clipboard.writeText(txt).then(()=>alert('✓ Copiado al portapapeles')).catch(()=>{
+    const ta=document.createElement('textarea');ta.value=txt;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);alert('✓ Copiado al portapapeles');
+  });
+}
+
 function acChip(v){
   acChipVal=v;
   ['todos','alerta','ok'].forEach(c=>document.getElementById('ac-chip-'+c).classList.toggle('active',c===v));
