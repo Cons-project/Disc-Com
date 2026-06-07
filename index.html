@@ -3142,7 +3142,7 @@ function buildMS(id,options){
   if(count>0)h+='<span class="ms-count">'+count+'</span>';
   h+='<span style="font-size:9px;color:var(--t3);">▼</span></button>';
   h+='<div class="ms-drop" id="ms-drop-'+id+'">';
-  h+='<div class="ms-search"><input type="text" placeholder="Buscar..." oninput="filterMS(\''+id+'\',this.value)"></div>';
+  h+='<div class="ms-search"><input type="text" placeholder="Buscar..." onclick="event.stopPropagation()" oninput="filterMS(\''+id+'\',this.value)"></div>';
   h+='<div id="ms-list-'+id+'">';
   options.forEach(opt=>{
     const sel=MS_STATE[id].includes(opt.value);
