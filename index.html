@@ -3175,7 +3175,11 @@ function filterMS(id,q){
     el.style.display=!q||el.dataset.label.includes(qn)?'flex':'none';
   });
 }
-document.addEventListener('click',function(){document.querySelectorAll('.ms-drop.open').forEach(d=>d.classList.remove('open'));});
+document.addEventListener('click',function(e){
+  document.querySelectorAll('.ms-drop.open').forEach(d=>{
+    if(!d.contains(e.target)&&!d.previousElementSibling?.contains(e.target))d.classList.remove('open');
+  });
+});
 
 function rebuildMS(keepOpenId=null){
   // Preserve search text for open dropdown before rebuild
