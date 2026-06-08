@@ -2819,7 +2819,7 @@ async function acLoadFromSB(){
   if(!SB)return;
   try{
     const {data}=await SB.from('acompañamientos').select('*').order('fecha',{ascending:false});
-    if(data&&data.length){DB.acompañamientos=data.filter(a=>!a.erased).map(a=>({id:a.id,ejecutivo:a.ejecutivo_id,fecha:a.fecha,cumplio_anterior:a.cumplio_anterior,compromiso_anterior:a.compromiso_anterior,compromiso_nuevo:a.compromiso_nuevo,notas:a.notas||'',registrado_por:a.registrado_por||''}));save();}
+    if(data&&data.length){DB.acompañamientos=data.filter(a=>!a.erased).map(a=>({id:a.id,ejecutivo:a.ejecutivo_id,fecha:a.fecha,cumplio_anterior:a.cumplio_anterior,compromiso_anterior:a.compromiso_anterior,compromiso_nuevo:a.compromiso_nuevo,notas:a.notas||'',registrado_por:a.registrado_por||'',temas_revisado:a.temas_revisado||[],temas_fortalecer:a.temas_fortalecer||[]}));save();}
   }catch(e){console.error('AC load:',e);}
 }
 
