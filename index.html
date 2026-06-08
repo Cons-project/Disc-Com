@@ -2414,24 +2414,28 @@ const AC_TEMAS=[
 ];
 let _acRevisado=[],_acFortalecer=[];
 
+function acToggleChip(tipo,idx){
+  const id=tipo==='revisado'?'chip-rev-'+idx:'chip-for-'+idx;
+  const el=document.getElementById(id);
+  if(!el)return;
+  el.classList.toggle('chip-sel');
+  const sel=el.classList.contains('chip-sel');
+  const color=tipo==='revisado'?'var(--gn)':'var(--am)';
+  const bg=tipo==='revisado'?'var(--gn2)':'var(--am2)';
+  el.style.borderColor=sel?color:'var(--bd)';
+  el.style.background=sel?bg:'var(--bg)';
+  el.style.color=sel?color:'var(--t2)';
+}
+
 function initAcChips(){
   ['revisado','fortalecer'].forEach(tipo=>{
-    const arr=tipo==='revisado'?_acRevisado:_acFortalecer;
     const el=document.getElementById('chips-'+tipo);
     if(!el)return;
     el.innerHTML=AC_TEMAS.map((t,i)=>{
-      const sel=arr.includes(i);
-      const color=tipo==='revisado'?'var(--gn)':'var(--am)';
-      const bg=tipo==='revisado'?'var(--gn2)':'var(--am2)';
-      return'<button onclick="acToggleChip(\''+tipo+'\','+i+')" style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid '+(sel?color:'var(--bd)')+';background:'+(sel?bg:'var(--bg)')+';color:'+(sel?color:'var(--t2)')+';cursor:pointer;transition:all .15s;">'+t+'</button>';
+      const chipId=tipo==='revisado'?'chip-rev-'+i:'chip-for-'+i;
+      return'<button id="'+chipId+'" onclick="acToggleChip(\''+tipo+'\','+i+')" style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid var(--bd);background:var(--bg);color:var(--t2);cursor:pointer;transition:all .15s;">'+t+'</button>';
     }).join('');
   });
-}
-function acToggleChip(tipo,idx){
-  const arr=tipo==='revisado'?_acRevisado:_acFortalecer;
-  const i=arr.indexOf(idx);
-  if(i>=0)arr.splice(i,1);else arr.push(idx);
-  initAcChips();
 }
 
 function acInit(){
@@ -2494,8 +2498,9 @@ async function acGuardar(){
   if(!fecha)return alert('Selecciona la fecha');
   const hist=(DB.acompañamientos||[]).filter(a=>a.ejecutivo===ejId).sort((a,b)=>b.fecha.localeCompare(a.fecha));
   const prevComp=hist.length?hist[0].compromiso_nuevo:null;
-  const revisado=_acRevisado.map(i=>AC_TEMAS[i]);
-  const fortalecer=_acFortalecer.map(i=>AC_TEMAS[i]);
+  // Leer chips directo del DOM al momento de guardar
+  const revisado=AC_TEMAS.filter((_,i)=>{const el=document.getElementById('chip-rev-'+i);return el&&el.classList.contains('chip-sel');});
+  const fortalecer=AC_TEMAS.filter((_,i)=>{const el=document.getElementById('chip-for-'+i);return el&&el.classList.contains('chip-sel');});
   const obj={id:'ac'+Date.now(),ejecutivo:ejId,fecha,cumplio_anterior:hist.length?acCumplioVal:null,compromiso_anterior:prevComp,compromiso_nuevo:compromiso,notas,registrado_por:quien,temas_revisado:revisado,temas_fortalecer:fortalecer};
   if(!DB.acompañamientos)DB.acompañamientos=[];
   DB.acompañamientos.push(obj);save();
