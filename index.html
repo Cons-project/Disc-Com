@@ -2484,7 +2484,7 @@ function acSetCumplio(val){
   document.getElementById('ac-no').style.background=!val?'var(--rd2)':'';
   document.getElementById('ac-no').style.color=!val?'var(--rd)':'';
 }
-function acGuardar(){
+async function acGuardar(){
   const ejId=document.getElementById('ac-ej').value;
   const fecha=document.getElementById('ac-fecha').value;
   const compromiso=document.getElementById('ac-compromiso').value.trim();
@@ -2499,7 +2499,15 @@ function acGuardar(){
   const obj={id:'ac'+Date.now(),ejecutivo:ejId,fecha,cumplio_anterior:hist.length?acCumplioVal:null,compromiso_anterior:prevComp,compromiso_nuevo:compromiso,notas,registrado_por:quien,temas_revisado:revisado,temas_fortalecer:fortalecer};
   if(!DB.acompañamientos)DB.acompañamientos=[];
   DB.acompañamientos.push(obj);save();
-  if(USE_SUPABASE){SB.from('acompañamientos').insert({ejecutivo_id:ejId,fecha,cumplio_anterior:hist.length?acCumplioVal:null,compromiso_anterior:prevComp,compromiso_nuevo:compromiso,notas,registrado_por:quien,temas_revisado:revisado,temas_fortalecer:fortalecer}).then(({error})=>{if(error)console.error('AC save:',error);});}
+  if(USE_SUPABASE&&SB){
+    const {error}=await SB.from('acompañamientos').insert({ejecutivo_id:ejId,fecha,cumplio_anterior:hist.length?acCumplioVal:null,compromiso_anterior:prevComp,compromiso_nuevo:compromiso,notas,registrado_por:quien,temas_revisado:revisado,temas_fortalecer:fortalecer});
+    if(error){
+      console.error('AC save error:',error);
+      if(error.message&&error.message.includes('temas')){
+        alert('Error: Las columnas temas_revisado/temas_fortalecer no existen en BD.\nEjecuta migracion_mvp20_acomp.sql en Supabase primero.');
+      }
+    }
+  }
   document.getElementById('ac-compromiso').value='';document.getElementById('ac-notas').value='';
   document.getElementById('ac-prev-wrap').style.display='none';acCumplioVal=null;
   _acRevisado=[];_acFortalecer=[];initAcChips();
