@@ -579,10 +579,12 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFAF8;}
           <th style="text-align:left;padding:6px 8px;font-size:10px;color:var(--t3);font-weight:500;">FECHA</th>
           <th style="text-align:left;padding:6px 8px;font-size:10px;color:var(--t3);font-weight:500;">EJECUTIVO</th>
           <th style="text-align:left;padding:6px 8px;font-size:10px;color:var(--t3);font-weight:500;">OFICINA</th>
+          <th style="text-align:left;padding:6px 8px;font-size:10px;color:var(--t3);font-weight:500;">REGISTRADO POR</th>
           <th style="text-align:left;padding:6px 8px;font-size:10px;color:var(--t3);font-weight:500;">SE REVISÓ</th>
           <th style="text-align:left;padding:6px 8px;font-size:10px;color:var(--t3);font-weight:500;">A FORTALECER</th>
           <th style="text-align:left;padding:6px 8px;font-size:10px;color:var(--t3);font-weight:500;">COMPROMISOS</th>
           <th style="text-align:left;padding:6px 8px;font-size:10px;color:var(--t3);font-weight:500;">COMENTARIOS</th>
+          <th id="det-th-del"></th>
         </tr></thead>
         <tbody id="det-tbody"></tbody>
       </table>
@@ -2532,28 +2534,42 @@ function acDetFiltrados(){
 function renderDetalle(){
   const rows=acDetFiltrados();
   let h='';
+  const isAdm=SESSION?.rol==='super_admin'||SESSION?.rol==='admin';
   rows.forEach(a=>{
     const ej=gEj(a.ejecutivo);const of=ej?gOf(ej.oficina):{nombre:'—'};
     const rev=(a.temas_revisado||[]).join(', ')||'—';
     const fort=(a.temas_fortalecer||[]).join(', ')||'—';
+    const delBtn=isAdm?'<td style="padding:4px 6px;"><button class="btn btn-sm" onclick="acBorrarDetalle(\''+a.id+'\')" style="font-size:10px;padding:2px 8px;color:var(--rd);border-color:var(--rd);background:var(--rd2);" title="Borrar registro">🗑</button></td>':'<td></td>';
     h+='<tr style="border-bottom:0.5px solid var(--bd);">'+
       '<td style="padding:7px 8px;white-space:nowrap;font-size:12px;">'+(a.fecha||'—')+'</td>'+
       '<td style="padding:7px 8px;font-size:12px;font-weight:500;">'+(ej?ej.nombre:'—')+'</td>'+
       '<td style="padding:7px 8px;font-size:11px;color:var(--t2);">'+of.nombre+'</td>'+
+      '<td style="padding:7px 8px;font-size:11px;color:var(--t2);white-space:nowrap;">'+(a.registrado_por||'—')+'</td>'+
       '<td style="padding:7px 8px;font-size:11px;color:var(--gn);max-width:160px;">'+rev+'</td>'+
       '<td style="padding:7px 8px;font-size:11px;color:var(--am);max-width:160px;">'+fort+'</td>'+
       '<td style="padding:7px 8px;font-size:11px;color:var(--t2);max-width:180px;">'+(a.compromiso_nuevo||'—')+'</td>'+
       '<td style="padding:7px 8px;font-size:11px;color:var(--t2);max-width:180px;">'+(a.notas||'—')+'</td>'+
+      delBtn+
       '</tr>';
   });
-  document.getElementById('det-tbody').innerHTML=h||'<tr><td colspan="7" style="padding:16px;text-align:center;color:var(--t3);font-size:12px;">Sin registros</td></tr>';
+  document.getElementById('det-tbody').innerHTML=h||'<tr><td colspan="9" style="padding:16px;text-align:center;color:var(--t3);font-size:12px;">Sin registros</td></tr>';
+}
+
+async function acBorrarDetalle(id){
+  if(SESSION?.rol!=='super_admin'&&SESSION?.rol!=='admin'){alert('Solo administradores pueden borrar registros.');return;}
+  if(!confirm('¿Borrar este acompañamiento? Quedará marcado como eliminado en la BD.'))return;
+  try{
+    if(USE_SUPABASE&&SB){const {error}=await SB.from('acompañamientos').update({erased:true}).eq('id',id);if(error)throw error;}
+    DB.acompañamientos=(DB.acompañamientos||[]).filter(a=>a.id!==id);
+    save();acRender();renderDetalle();
+  }catch(e){alert('Error al borrar: '+e.message);}
 }
 function acDetCSV(){
   const rows=acDetFiltrados();
-  const hdr=['Fecha','Ejecutivo','Oficina','Se revisó en sesión','Se debe fortalecer','Compromisos','Comentarios'];
+  const hdr=['Fecha','Ejecutivo','Oficina','Registrado por','Se revisó en sesión','Se debe fortalecer','Compromisos','Comentarios'];
   const data=[hdr,...rows.map(a=>{
     const ej=gEj(a.ejecutivo);const of=ej?gOf(ej.oficina):{nombre:''};
-    return[a.fecha||'',ej?ej.nombre:'',of.nombre,(a.temas_revisado||[]).join('; '),(a.temas_fortalecer||[]).join('; '),a.compromiso_nuevo||'',a.notas||''];
+    return[a.fecha||'',ej?ej.nombre:'',of.nombre,a.registrado_por||'',(a.temas_revisado||[]).join('; '),(a.temas_fortalecer||[]).join('; '),a.compromiso_nuevo||'',a.notas||''];
   })];
   const csv='\uFEFF'+data.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n');
   descargarArchivo(csv,'Seguimiento_Acomp_'+new Date().toISOString().split('T')[0]+'.csv','text/csv;charset=utf-8;');
@@ -2569,7 +2585,7 @@ function acDetCopiar(){
   let txt='📋 SEGUIMIENTO DE ACOMPAÑAMIENTO\n'+new Date().toLocaleDateString('es-MX')+'\n'+'─'.repeat(40)+'\n\n';
   rows.forEach(a=>{
     const ej=gEj(a.ejecutivo);const of=ej?gOf(ej.oficina):{nombre:''};
-    txt+='📅 '+a.fecha+' — '+(ej?ej.nombre:'')+' ('+of.nombre+')\n';
+    txt+='📅 '+a.fecha+' — '+(ej?ej.nombre:'')+' ('+of.nombre+')'+(a.registrado_por?' · '+a.registrado_por:'')+'\n';
     if((a.temas_revisado||[]).length)txt+='✅ Se revisó: '+(a.temas_revisado||[]).join(', ')+'\n';
     if((a.temas_fortalecer||[]).length)txt+='⚠️ A fortalecer: '+(a.temas_fortalecer||[]).join(', ')+'\n';
     if(a.compromiso_nuevo)txt+='📌 Compromiso: '+a.compromiso_nuevo+'\n';
