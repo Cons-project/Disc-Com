@@ -478,6 +478,23 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFAF8;}
   </div>
 </div>
 
+<!-- Modal Editar Evaluación -->
+<div id="edit-eval-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:1200;align-items:center;justify-content:center;overflow-y:auto;padding:20px 10px;">
+  <div style="background:var(--surface);border-radius:var(--r);max-width:520px;width:100%;padding:24px;margin:auto;">
+    <div style="font-size:16px;font-weight:600;margin-bottom:4px;">✏️ Editar calificación por criterio</div>
+    <div style="font-size:12px;color:var(--t2);margin-bottom:16px;">El registro original no se borra. Solo se actualizan los scores y el total se recalcula automáticamente.</div>
+    <div id="edit-eval-criterios" style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;"></div>
+    <div style="background:var(--bg);border-radius:var(--rs);padding:10px 14px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;">
+      <span style="font-size:13px;font-weight:600;">Score total recalculado</span>
+      <span id="edit-eval-total" style="font-size:20px;font-weight:700;">—</span>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button class="btn" onclick="document.getElementById('edit-eval-modal').style.display='none'">Cancelar</button>
+      <button class="btn btn-p" onclick="guardarEditarEval()">✓ Guardar cambios</button>
+    </div>
+  </div>
+</div>
+
 <!-- Evolución -->
 <div class="vw" id="vw-evolución">
   <div class="pt">Evolución por ejecutivo</div><div class="ps">Historial de scores mes a mes</div>
@@ -2555,6 +2572,69 @@ function renderDetalle(){
   document.getElementById('det-tbody').innerHTML=h||'<tr><td colspan="9" style="padding:16px;text-align:center;color:var(--t3);font-size:12px;">Sin registros</td></tr>';
 }
 
+let _editEvalId=null;
+
+function abrirEditarEval(evalId){
+  const e=DB.evaluaciones.find(x=>x.id===evalId);
+  if(!e){alert('Evaluación no encontrada');return;}
+  _editEvalId=evalId;
+  let h='';
+  DB.criterios.forEach((c,ci)=>{
+    const val=(e.criterios&&e.criterios[ci]!==undefined)?e.criterios[ci]:0;
+    const color=val>=80?'var(--gn)':val>=50?'var(--am)':'var(--rd)';
+    h+='<div style="background:var(--bg);border:1px solid var(--bd);border-radius:var(--rs);padding:10px 14px;">';
+    h+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">';
+    h+='<label style="font-size:12px;font-weight:500;" for="ec-'+ci+'">'+c.nombre+'</label>';
+    h+='<span id="ec-disp-'+ci+'" style="font-size:13px;font-weight:600;color:'+color+';">'+val+'%</span>';
+    h+='</div>';
+    h+='<input type="range" id="ec-'+ci+'" min="0" max="100" step="1" value="'+val+'" style="width:100%;" oninput="ecUpdate('+ci+',this.value)">';
+    h+='</div>';
+  });
+  document.getElementById('edit-eval-criterios').innerHTML=h;
+  ecRecalc();
+  document.getElementById('edit-eval-modal').style.display='flex';
+}
+
+function ecUpdate(ci,val){
+  const num=parseInt(val);
+  const color=num>=80?'var(--gn)':num>=50?'var(--am)':'var(--rd)';
+  const disp=document.getElementById('ec-disp-'+ci);
+  if(disp){disp.textContent=num+'%';disp.style.color=color;}
+  ecRecalc();
+}
+
+function ecRecalc(){
+  const vals=DB.criterios.map((_,ci)=>{const el=document.getElementById('ec-'+ci);return el?parseInt(el.value):0;});
+  const total=Math.round(vals.reduce((s,v)=>s+v,0)/vals.length);
+  const el=document.getElementById('edit-eval-total');
+  if(el){el.textContent=total+'/100';el.style.color=total>=80?'var(--gn)':total>=50?'var(--am)':'var(--rd)';}
+}
+
+async function guardarEditarEval(){
+  if(!_editEvalId)return;
+  const e=DB.evaluaciones.find(x=>x.id===_editEvalId);
+  if(!e){alert('Evaluación no encontrada');return;}
+  const nuevos=DB.criterios.map((_,ci)=>{const el=document.getElementById('ec-'+ci);return el?parseInt(el.value):0;});
+  const nuevoScore=Math.round(nuevos.reduce((s,v)=>s+v,0)/nuevos.length);
+  e.criterios=nuevos;e.score=nuevoScore;save();
+  if(USE_SUPABASE&&SB){
+    const sid=e.sb_id||e.id;
+    const {error}=await SB.from('evaluaciones').update({scores_criterios:nuevos,score:nuevoScore}).eq('id',sid);
+    if(error){alert('Error al guardar en BD: '+error.message);return;}
+  }
+  document.getElementById('edit-eval-modal').style.display='none';
+  _editEvalId=null;
+  // Refresh en cascada
+  rD();
+  if(typeof rEvo==='function')rEvo();
+  if(typeof rOf==='function')rOf();
+  acRender();renderDetalle();
+  if(document.getElementById('vw-estrategico')&&document.getElementById('vw-estrategico').classList.contains('active'))initEstrategico();
+  const histWrap=document.getElementById('ac-historial-wrap');
+  if(histWrap&&histWrap.style.display!=='none'){const ejDiv=document.getElementById('ac-hist-list');if(ejDiv){const ejId=e.ejecutivo;if(ejId)acVerHist(ejId);}}
+  alert('✓ Calificación actualizada en todos los tableros');
+}
+
 async function acBorrarDetalle(id){
   if(SESSION?.rol!=='super_admin'&&SESSION?.rol!=='admin'){alert('Solo administradores pueden borrar registros.');return;}
   if(!confirm('¿Borrar este acompañamiento? Quedará marcado como eliminado en la BD.'))return;
@@ -2771,7 +2851,8 @@ function acVerHist(ejId){
         }
         retroHtml+='</div>';
       }
-      h+='<div style="background:var(--surface);border:1px solid var(--bd);border-left:3px solid '+sc(e.score)+';border-radius:var(--rs);padding:12px 14px;margin-bottom:8px;"><div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;"><span style="font-size:10px;font-weight:600;color:'+sc(e.score)+';text-transform:uppercase;">📊 Evaluación</span><span style="font-size:12px;font-weight:500;">'+(e.fecha?e.fecha.split('T')[0]:mL(e.mes))+'</span><span style="font-size:11px;color:var(--t3);">'+lytLbl+'</span><span style="font-size:13px;font-weight:600;color:'+sc(e.score)+';margin-left:auto;">'+e.score+'/100</span><span style="font-size:11px;color:var(--t3);">Evaluador: <b>'+(e.evaluador||'—')+'</b></span>'+delBtn+'</div>'+(e.notas?'<div style="font-size:12px;color:var(--t);">'+e.notas+'</div>':'<div style="font-size:11px;color:var(--t3);font-style:italic;">Sin notas</div>')+detalleHtml+retroHtml+'</div>';
+      const editBtn=(SESSION?.rol==='super_admin'||SESSION?.rol==='admin')?'<button class="btn btn-sm" onclick="abrirEditarEval(\''+e.id+'\')" style="font-size:10px;padding:2px 8px;margin-left:4px;" title="Editar calificación">✏️ Editar</button>':'';
+      h+='<div style="background:var(--surface);border:1px solid var(--bd);border-left:3px solid '+sc(e.score)+';border-radius:var(--rs);padding:12px 14px;margin-bottom:8px;"><div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;"><span style="font-size:10px;font-weight:600;color:'+sc(e.score)+';text-transform:uppercase;">📊 Evaluación</span><span style="font-size:12px;font-weight:500;">'+(e.fecha?e.fecha.split('T')[0]:mL(e.mes))+'</span><span style="font-size:11px;color:var(--t3);">'+lytLbl+'</span><span style="font-size:13px;font-weight:600;color:'+sc(e.score)+';margin-left:auto;">'+e.score+'/100</span><span style="font-size:11px;color:var(--t3);">Evaluador: <b>'+(e.evaluador||'—')+'</b></span>'+delBtn+editBtn+'</div>'+(e.notas?'<div style="font-size:12px;color:var(--t);">'+e.notas+'</div>':'<div style="font-size:11px;color:var(--t3);font-style:italic;">Sin notas</div>')+detalleHtml+retroHtml+'</div>';
     }
   });}
   document.getElementById('ac-hist-list').innerHTML=h;
