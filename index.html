@@ -2575,48 +2575,86 @@ function renderDetalle(){
 
 let _editEvalId=null;
 let _editEvalConfig=null;
+let _editMode=null; // 'checklist' | 'slider'
 
 function abrirEditarEval(evalId){
   const e=DB.evaluaciones.find(x=>x.id===evalId);
   if(!e){alert('Evaluación no encontrada');return;}
-  if(!e.detalle||!Array.isArray(e.detalle)){
-    alert('Esta evaluación no tiene el detalle de preguntas guardado (registro antiguo). No se puede editar por pregunta.');
-    return;
-  }
   _editEvalId=evalId;
   const config=getEvalConfig(e.layout||e.layout_id||1);
   _editEvalConfig=config;
-  // Agrupar por criterio
   const porCrit={};
   config.forEach((p,i)=>{
     if(!porCrit[p.criterio_idx])porCrit[p.criterio_idx]=[];
     porCrit[p.criterio_idx].push({...p,idx:i});
   });
+  const tieneDetalle=e.detalle&&Array.isArray(e.detalle);
+  const coincide=tieneDetalle&&config.length===e.detalle.length;
   let h='';
-  DB.criterios.forEach((c,ci)=>{
-    const preguntas=porCrit[ci]||[];
-    if(!preguntas.length)return;
-    h+='<div style="background:var(--bg);border:1px solid var(--bd);border-radius:var(--rs);padding:10px 14px;">';
-    h+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">';
-    h+='<span style="font-size:12px;font-weight:600;">'+c.nombre+'</span>';
-    h+='<span id="ec-disp-'+ci+'" style="font-size:13px;font-weight:600;">—</span>';
+  if(!coincide){
+    _editMode='slider';
+    h+='<div style="background:var(--am2);border-left:3px solid var(--am);border-radius:var(--rs);padding:10px 14px;margin-bottom:6px;font-size:12px;color:var(--am);">';
+    h+='⚠ Esta evaluación se guardó con una versión anterior del banco de preguntas'+(tieneDetalle?' ('+e.detalle.length+' vs '+config.length+' preguntas actuales)':' (sin detalle de preguntas guardado)')+'.';
+    h+='<br>Ajusta el % de cada criterio directamente con las barras. El score total se recalcula respetando el peso ponderado de cada criterio en la configuración actual.';
     h+='</div>';
-    preguntas.forEach(p=>{
-      const checked=e.detalle[p.idx]?'checked':'';
-      h+='<label style="display:flex;align-items:flex-start;gap:8px;font-size:12px;color:var(--t2);padding:4px 0;cursor:pointer;">';
-      h+='<input type="checkbox" data-idx="'+p.idx+'" data-crit="'+ci+'" '+checked+' onchange="ecRecalc()" style="margin-top:2px;width:14px;height:14px;flex-shrink:0;">';
-      h+='<span style="flex:1;">'+p.texto+'</span>';
-      h+='<span style="font-size:10px;color:var(--t3);flex-shrink:0;">'+p.pts+'p</span>';
-      h+='</label>';
+    DB.criterios.forEach((c,ci)=>{
+      const val=(e.criterios&&e.criterios[ci]!==undefined)?e.criterios[ci]:0;
+      const color=val>=80?'var(--gn)':val>=50?'var(--am)':'var(--rd)';
+      const peso=porCrit[ci]?porCrit[ci].reduce((s,p)=>s+p.pts,0):0;
+      h+='<div style="background:var(--bg);border:1px solid var(--bd);border-radius:var(--rs);padding:10px 14px;">';
+      h+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">';
+      h+='<label style="font-size:12px;font-weight:500;">'+c.nombre+' <span style="font-size:10px;color:var(--t3);">(peso: '+peso+'p)</span></label>';
+      h+='<span id="ec-disp-'+ci+'" style="font-size:13px;font-weight:600;color:'+color+';">'+val+'%</span>';
+      h+='</div>';
+      h+='<input type="range" data-crit="'+ci+'" data-peso="'+peso+'" min="0" max="100" step="1" value="'+val+'" style="width:100%;" oninput="ecSliderUpdate('+ci+',this.value)">';
+      h+='</div>';
     });
-    h+='</div>';
-  });
+  }else{
+    _editMode='checklist';
+    DB.criterios.forEach((c,ci)=>{
+      const preguntas=porCrit[ci]||[];
+      if(!preguntas.length)return;
+      h+='<div style="background:var(--bg);border:1px solid var(--bd);border-radius:var(--rs);padding:10px 14px;">';
+      h+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">';
+      h+='<span style="font-size:12px;font-weight:600;">'+c.nombre+'</span>';
+      h+='<span id="ec-disp-'+ci+'" style="font-size:13px;font-weight:600;">—</span>';
+      h+='</div>';
+      preguntas.forEach(p=>{
+        const checked=e.detalle[p.idx]?'checked':'';
+        h+='<label style="display:flex;align-items:flex-start;gap:8px;font-size:12px;color:var(--t2);padding:4px 0;cursor:pointer;">';
+        h+='<input type="checkbox" data-idx="'+p.idx+'" data-crit="'+ci+'" '+checked+' onchange="ecRecalc()" style="margin-top:2px;width:14px;height:14px;flex-shrink:0;">';
+        h+='<span style="flex:1;">'+p.texto+'</span>';
+        h+='<span style="font-size:10px;color:var(--t3);flex-shrink:0;">'+p.pts+'p</span>';
+        h+='</label>';
+      });
+      h+='</div>';
+    });
+  }
   document.getElementById('edit-eval-criterios').innerHTML=h;
   ecRecalc();
   document.getElementById('edit-eval-modal').style.display='flex';
 }
 
+function ecSliderUpdate(ci,val){
+  const num=parseInt(val);
+  const color=num>=80?'var(--gn)':num>=50?'var(--am)':'var(--rd)';
+  const disp=document.getElementById('ec-disp-'+ci);
+  if(disp){disp.textContent=num+'%';disp.style.color=color;}
+  ecRecalc();
+}
+
 function ecRecalc(){
+  if(_editMode==='slider'){
+    let tot=0;
+    document.querySelectorAll('input[type="range"][data-crit]').forEach(sl=>{
+      const pct=parseInt(sl.value);const peso=parseInt(sl.dataset.peso)||0;
+      tot+=(pct/100)*peso;
+    });
+    const total=Math.round(tot);
+    const el=document.getElementById('edit-eval-total');
+    if(el){el.textContent=total+'/100';el.style.color=total>=80?'var(--gn)':total>=50?'var(--am)':'var(--rd)';}
+    return;
+  }
   const config=_editEvalConfig;
   if(!config)return;
   const porCrit={};
@@ -2641,33 +2679,43 @@ function ecRecalc(){
 }
 
 async function guardarEditarEval(){
-  if(!_editEvalId||!_editEvalConfig)return;
+  if(!_editEvalId)return;
   const e=DB.evaluaciones.find(x=>x.id===_editEvalId);
   if(!e){alert('Evaluación no encontrada');return;}
-  const config=_editEvalConfig;
-  // Reconstruir array de checks
-  const nuevoDetalle=config.map((p,i)=>{
-    const cb=document.querySelector('input[data-idx="'+i+'"]');
-    return cb?cb.checked:false;
-  });
-  // Recalcular criterios y score (igual lógica que guardar())
-  const porCrit={};
-  config.forEach((p,i)=>{
-    if(!porCrit[p.criterio_idx])porCrit[p.criterio_idx]={got:0,max:0};
-    porCrit[p.criterio_idx].max+=p.pts;
-    if(nuevoDetalle[i])porCrit[p.criterio_idx].got+=p.pts;
-  });
-  let tot=0;const cS=[];
-  DB.criterios.forEach((c,ci)=>{const pc=porCrit[ci]||{got:0,max:0};const pct=pc.max?Math.round((pc.got/pc.max)*100):0;cS.push(pct);tot+=pc.got;});
-  const nuevoScore=Math.round(tot);
+  let cS,nuevoScore,nuevoDetalle=e.detalle;
+
+  if(_editMode==='slider'){
+    cS=[];let tot=0;
+    document.querySelectorAll('input[type="range"][data-crit]').forEach(sl=>{
+      const ci=parseInt(sl.dataset.crit);const pct=parseInt(sl.value);const peso=parseInt(sl.dataset.peso)||0;
+      cS[ci]=pct;tot+=(pct/100)*peso;
+    });
+    nuevoScore=Math.round(tot);
+    // detalle no se modifica en modo slider (no hay correspondencia 1:1 confiable)
+  }else{
+    const config=_editEvalConfig;
+    nuevoDetalle=config.map((p,i)=>{const cb=document.querySelector('input[data-idx="'+i+'"]');return cb?cb.checked:false;});
+    const porCrit={};
+    config.forEach((p,i)=>{
+      if(!porCrit[p.criterio_idx])porCrit[p.criterio_idx]={got:0,max:0};
+      porCrit[p.criterio_idx].max+=p.pts;
+      if(nuevoDetalle[i])porCrit[p.criterio_idx].got+=p.pts;
+    });
+    cS=[];let tot=0;
+    DB.criterios.forEach((c,ci)=>{const pc=porCrit[ci]||{got:0,max:0};const pct=pc.max?Math.round((pc.got/pc.max)*100):0;cS.push(pct);tot+=pc.got;});
+    nuevoScore=Math.round(tot);
+  }
+
   e.criterios=cS;e.score=nuevoScore;e.detalle=nuevoDetalle;save();
   if(USE_SUPABASE&&SB){
     const sid=e.sb_id||e.id;
-    const {error}=await SB.from('evaluaciones').update({scores_criterios:cS,score:nuevoScore,detalle_checks:nuevoDetalle}).eq('id',sid);
+    const payload={scores_criterios:cS,score:nuevoScore};
+    if(_editMode==='checklist')payload.detalle_checks=nuevoDetalle;
+    const {error}=await SB.from('evaluaciones').update(payload).eq('id',sid);
     if(error){alert('Error al guardar en BD: '+error.message);return;}
   }
   document.getElementById('edit-eval-modal').style.display='none';
-  _editEvalId=null;_editEvalConfig=null;
+  _editEvalId=null;_editEvalConfig=null;_editMode=null;
   rD();
   if(typeof rEvo==='function')rEvo();
   if(typeof rOf==='function')rOf();
