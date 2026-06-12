@@ -1701,7 +1701,8 @@ function rD(){
     const pc=prev?'<span style="font-size:12px;color:var(--t2)">'+mL(prev.mes)+': <b>'+prev.score+'</b> pts</span>':'<span style="color:var(--t3);font-size:12px">Sin historial</span>';
     const ec=ev?(ev.guardada?sBd(ev.score):'<span class="badge ba">Sin cerrar</span>'):'<span class="badge bgr">Pendiente</span>';
     const faseTag=ej.fase?'<span style="font-size:11px;font-weight:500;padding:2px 7px;border-radius:20px;background:var(--pu2);color:var(--pu);">'+ej.fase+'</span>':'<span style="color:var(--t3);font-size:11px;">—</span>';
-    h+='<tr><td style="font-weight:500">'+ej.nombre+'</td><td>'+gOf(ej.oficina).nombre+'</td><td>'+faseTag+'</td><td>'+pc+'</td><td>'+ec+'</td><td><button class="btn btn-sm" onclick="gE(\''+ej.id+'\',\''+mes+'\')">'+  (ev?'Ver / editar':'Evaluar')+'</button></td></tr>';
+    const editBtnHome=(ev&&ev.guardada&&(SESSION?.rol==='super_admin'||SESSION?.rol==='admin'))?' <button class="btn btn-sm" onclick="abrirEditarEval(\''+ev.id+'\')" style="font-size:10px;padding:1px 6px;" title="Editar calificación">✏️</button>':'';
+    h+='<tr><td style="font-weight:500">'+ej.nombre+'</td><td>'+gOf(ej.oficina).nombre+'</td><td>'+faseTag+'</td><td>'+pc+'</td><td>'+ec+editBtnHome+'</td><td><button class="btn btn-sm" onclick="gE(\''+ej.id+'\',\''+mes+'\')">'+  (ev?'Ver / editar':'Evaluar')+'</button></td></tr>';
   });
   document.getElementById('etb').innerHTML=h||'<tr><td colspan="5" class="empty">Sin resultados</td></tr>';
 }
