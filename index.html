@@ -479,11 +479,11 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFAF8;}
 </div>
 
 <!-- Modal Editar Evaluación -->
-<div id="edit-eval-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:1200;align-items:center;justify-content:center;overflow-y:auto;padding:20px 10px;">
-  <div style="background:var(--surface);border-radius:var(--r);max-width:520px;width:100%;padding:24px;margin:auto;">
-    <div style="font-size:16px;font-weight:600;margin-bottom:4px;">✏️ Editar calificación por criterio</div>
-    <div style="font-size:12px;color:var(--t2);margin-bottom:16px;">El registro original no se borra. Solo se actualizan los scores y el total se recalcula automáticamente.</div>
-    <div id="edit-eval-criterios" style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;"></div>
+<div id="edit-eval-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:1200;align-items:flex-start;justify-content:center;overflow-y:auto;padding:20px 10px;">
+  <div style="background:var(--surface);border-radius:var(--r);max-width:640px;width:100%;padding:24px;margin:auto;">
+    <div style="font-size:16px;font-weight:600;margin-bottom:4px;">✏️ Editar respuestas de la evaluación</div>
+    <div style="font-size:12px;color:var(--t2);margin-bottom:16px;">El registro original no se borra. Ajusta las preguntas marcadas y el score por criterio + total se recalculan automáticamente, igual que al guardar una evaluación.</div>
+    <div id="edit-eval-criterios" style="display:flex;flex-direction:column;gap:14px;margin-bottom:16px;max-height:55vh;overflow-y:auto;"></div>
     <div style="background:var(--bg);border-radius:var(--rs);padding:10px 14px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;">
       <span style="font-size:13px;font-weight:600;">Score total recalculado</span>
       <span id="edit-eval-total" style="font-size:20px;font-weight:700;">—</span>
@@ -2574,21 +2574,41 @@ function renderDetalle(){
 }
 
 let _editEvalId=null;
+let _editEvalConfig=null;
 
 function abrirEditarEval(evalId){
   const e=DB.evaluaciones.find(x=>x.id===evalId);
   if(!e){alert('Evaluación no encontrada');return;}
+  if(!e.detalle||!Array.isArray(e.detalle)){
+    alert('Esta evaluación no tiene el detalle de preguntas guardado (registro antiguo). No se puede editar por pregunta.');
+    return;
+  }
   _editEvalId=evalId;
+  const config=getEvalConfig(e.layout||e.layout_id||1);
+  _editEvalConfig=config;
+  // Agrupar por criterio
+  const porCrit={};
+  config.forEach((p,i)=>{
+    if(!porCrit[p.criterio_idx])porCrit[p.criterio_idx]=[];
+    porCrit[p.criterio_idx].push({...p,idx:i});
+  });
   let h='';
   DB.criterios.forEach((c,ci)=>{
-    const val=(e.criterios&&e.criterios[ci]!==undefined)?e.criterios[ci]:0;
-    const color=val>=80?'var(--gn)':val>=50?'var(--am)':'var(--rd)';
+    const preguntas=porCrit[ci]||[];
+    if(!preguntas.length)return;
     h+='<div style="background:var(--bg);border:1px solid var(--bd);border-radius:var(--rs);padding:10px 14px;">';
-    h+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">';
-    h+='<label style="font-size:12px;font-weight:500;" for="ec-'+ci+'">'+c.nombre+'</label>';
-    h+='<span id="ec-disp-'+ci+'" style="font-size:13px;font-weight:600;color:'+color+';">'+val+'%</span>';
+    h+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">';
+    h+='<span style="font-size:12px;font-weight:600;">'+c.nombre+'</span>';
+    h+='<span id="ec-disp-'+ci+'" style="font-size:13px;font-weight:600;">—</span>';
     h+='</div>';
-    h+='<input type="range" id="ec-'+ci+'" min="0" max="100" step="1" value="'+val+'" style="width:100%;" oninput="ecUpdate('+ci+',this.value)">';
+    preguntas.forEach(p=>{
+      const checked=e.detalle[p.idx]?'checked':'';
+      h+='<label style="display:flex;align-items:flex-start;gap:8px;font-size:12px;color:var(--t2);padding:4px 0;cursor:pointer;">';
+      h+='<input type="checkbox" data-idx="'+p.idx+'" data-crit="'+ci+'" '+checked+' onchange="ecRecalc()" style="margin-top:2px;width:14px;height:14px;flex-shrink:0;">';
+      h+='<span style="flex:1;">'+p.texto+'</span>';
+      h+='<span style="font-size:10px;color:var(--t3);flex-shrink:0;">'+p.pts+'p</span>';
+      h+='</label>';
+    });
     h+='</div>';
   });
   document.getElementById('edit-eval-criterios').innerHTML=h;
@@ -2596,43 +2616,65 @@ function abrirEditarEval(evalId){
   document.getElementById('edit-eval-modal').style.display='flex';
 }
 
-function ecUpdate(ci,val){
-  const num=parseInt(val);
-  const color=num>=80?'var(--gn)':num>=50?'var(--am)':'var(--rd)';
-  const disp=document.getElementById('ec-disp-'+ci);
-  if(disp){disp.textContent=num+'%';disp.style.color=color;}
-  ecRecalc();
-}
-
 function ecRecalc(){
-  const vals=DB.criterios.map((_,ci)=>{const el=document.getElementById('ec-'+ci);return el?parseInt(el.value):0;});
-  const total=Math.round(vals.reduce((s,v)=>s+v,0)/vals.length);
+  const config=_editEvalConfig;
+  if(!config)return;
+  const porCrit={};
+  config.forEach((p,i)=>{
+    if(!porCrit[p.criterio_idx])porCrit[p.criterio_idx]={got:0,max:0};
+    porCrit[p.criterio_idx].max+=p.pts;
+    const cb=document.querySelector('input[data-idx="'+i+'"]');
+    if(cb&&cb.checked)porCrit[p.criterio_idx].got+=p.pts;
+  });
+  let tot=0;
+  DB.criterios.forEach((c,ci)=>{
+    const pc=porCrit[ci];
+    if(!pc)return;
+    const pct=pc.max?Math.round((pc.got/pc.max)*100):0;
+    tot+=pc.got;
+    const disp=document.getElementById('ec-disp-'+ci);
+    if(disp){disp.textContent=pct+'%';disp.style.color=pct>=80?'var(--gn)':pct>=50?'var(--am)':'var(--rd)';}
+  });
+  const total=Math.round(tot);
   const el=document.getElementById('edit-eval-total');
   if(el){el.textContent=total+'/100';el.style.color=total>=80?'var(--gn)':total>=50?'var(--am)':'var(--rd)';}
 }
 
 async function guardarEditarEval(){
-  if(!_editEvalId)return;
+  if(!_editEvalId||!_editEvalConfig)return;
   const e=DB.evaluaciones.find(x=>x.id===_editEvalId);
   if(!e){alert('Evaluación no encontrada');return;}
-  const nuevos=DB.criterios.map((_,ci)=>{const el=document.getElementById('ec-'+ci);return el?parseInt(el.value):0;});
-  const nuevoScore=Math.round(nuevos.reduce((s,v)=>s+v,0)/nuevos.length);
-  e.criterios=nuevos;e.score=nuevoScore;save();
+  const config=_editEvalConfig;
+  // Reconstruir array de checks
+  const nuevoDetalle=config.map((p,i)=>{
+    const cb=document.querySelector('input[data-idx="'+i+'"]');
+    return cb?cb.checked:false;
+  });
+  // Recalcular criterios y score (igual lógica que guardar())
+  const porCrit={};
+  config.forEach((p,i)=>{
+    if(!porCrit[p.criterio_idx])porCrit[p.criterio_idx]={got:0,max:0};
+    porCrit[p.criterio_idx].max+=p.pts;
+    if(nuevoDetalle[i])porCrit[p.criterio_idx].got+=p.pts;
+  });
+  let tot=0;const cS=[];
+  DB.criterios.forEach((c,ci)=>{const pc=porCrit[ci]||{got:0,max:0};const pct=pc.max?Math.round((pc.got/pc.max)*100):0;cS.push(pct);tot+=pc.got;});
+  const nuevoScore=Math.round(tot);
+  e.criterios=cS;e.score=nuevoScore;e.detalle=nuevoDetalle;save();
   if(USE_SUPABASE&&SB){
     const sid=e.sb_id||e.id;
-    const {error}=await SB.from('evaluaciones').update({scores_criterios:nuevos,score:nuevoScore}).eq('id',sid);
+    const {error}=await SB.from('evaluaciones').update({scores_criterios:cS,score:nuevoScore,detalle_checks:nuevoDetalle}).eq('id',sid);
     if(error){alert('Error al guardar en BD: '+error.message);return;}
   }
   document.getElementById('edit-eval-modal').style.display='none';
-  _editEvalId=null;
-  // Refresh en cascada
+  _editEvalId=null;_editEvalConfig=null;
   rD();
   if(typeof rEvo==='function')rEvo();
   if(typeof rOf==='function')rOf();
   acRender();renderDetalle();
   if(document.getElementById('vw-estrategico')&&document.getElementById('vw-estrategico').classList.contains('active'))initEstrategico();
   const histWrap=document.getElementById('ac-historial-wrap');
-  if(histWrap&&histWrap.style.display!=='none'){const ejDiv=document.getElementById('ac-hist-list');if(ejDiv){const ejId=e.ejecutivo;if(ejId)acVerHist(ejId);}}
+  if(histWrap&&histWrap.style.display!=='none'){const ejId=e.ejecutivo;if(ejId)acVerHist(ejId);}
   alert('✓ Calificación actualizada en todos los tableros');
 }
 
