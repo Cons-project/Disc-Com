@@ -435,20 +435,29 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFAF8;}
   <div class="no-print">
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;">
       <div><label style="font-size:11px;color:var(--t2);display:block;margin-bottom:4px;">Oficina</label>
-        <select class="sel" id="rd-of" onchange="rdFiltrar()"><option value="">Todas</option></select></div>
+        <div class="ms-wrap" id="ms-rd-oficina" style="min-width:160px;"></div></div>
       <div><label style="font-size:11px;color:var(--t2);display:block;margin-bottom:4px;">Fase</label>
-        <select class="sel" id="rd-fase" onchange="rdFiltrar()"><option value="">Todas</option></select></div>
+        <div class="ms-wrap" id="ms-rd-fase" style="min-width:160px;"></div></div>
       <div><label style="font-size:11px;color:var(--t2);display:block;margin-bottom:4px;">Ejecutivo</label>
-        <select class="sel" id="rd-ej" onchange="rdMostrar()" style="min-width:200px;"><option value="">Selecciona un ejecutivo...</option></select></div>
+        <div class="ms-wrap" id="ms-rd-ejecutivo" style="min-width:220px;"></div></div>
       <div><label style="font-size:11px;color:var(--t2);display:block;margin-bottom:4px;">Mes</label>
-        <select class="sel" id="rd-mes" onchange="rdMostrar()"><option value="">Último disponible</option></select></div>
+        <select class="sel" id="rd-mes" onchange="rdRenderList()"><option value="">Último disponible</option></select></div>
+      <div><label style="font-size:11px;color:var(--t2);display:block;margin-bottom:4px;">Ordenar por</label>
+        <select class="sel" id="rd-sort" onchange="rdRenderList()">
+          <option value="oficina">Oficina</option>
+          <option value="score_desc">Score (mayor a menor)</option>
+          <option value="score_asc">Score (menor a mayor)</option>
+          <option value="nombre">Nombre</option>
+        </select></div>
+      <button class="btn btn-sm" onclick="rdLimpiarFiltros()">Limpiar</button>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
       <button class="btn btn-sm no-print" onclick="rdPDF()">📄 PDF</button>
-      <button class="btn btn-sm no-print" onclick="rdExcel()">⬇ Excel detallado</button>
+      <button class="btn btn-sm no-print" onclick="rdExcel()">⬇ Excel detallado (base de datos)</button>
     </div>
   </div>
-  <div id="rd-content"><div style="font-size:13px;color:var(--t2);text-align:center;padding:40px;">Selecciona un ejecutivo para ver su reporte detallado.</div></div>
+  <div id="rd-kpis"></div>
+  <div id="rd-content"></div>
 </div>
 
 <!-- Modal Retroalimentación post-evaluación -->
@@ -4432,37 +4441,103 @@ if(_origRAdmin){
 // ══════════════════════════════════════════════════════════
 // REPORTE DETALLADO
 // ══════════════════════════════════════════════════════════
+const RD_MS_STATE={oficina:[],fase:[],ejecutivo:[]};
+const RD_MS_OPTIONS={oficina:[],fase:[],ejecutivo:[]};
+
+function buildRDMS(id){
+  const wrap=document.getElementById('ms-rd-'+id);if(!wrap)return;
+  const count=RD_MS_STATE[id].length;
+  const btnLabel=count===0?'Todas':count+' seleccionadas';
+  let h='<button class="ms-btn" type="button" onclick="toggleRDMSDrop(\''+id+'\',event)">';
+  h+='<span>'+btnLabel+'</span>';
+  if(count>0)h+='<span class="ms-count">'+count+'</span>';
+  h+='<span style="font-size:9px;color:var(--t3);">▼</span></button>';
+  h+='<div class="ms-drop" id="ms-rd-drop-'+id+'">';
+  h+='<div class="ms-search"><input type="text" placeholder="Buscar..." onclick="event.stopPropagation()" oninput="filterRDMS(\''+id+'\',this.value)"></div>';
+  h+='<div id="ms-rd-list-'+id+'">';
+  RD_MS_OPTIONS[id].forEach(opt=>{
+    const sel=RD_MS_STATE[id].includes(opt.value);
+    const valEsc=opt.value.replace(/'/g,"\\'");
+    h+='<div class="ms-opt'+(sel?' sel':'')+'" data-label="'+normalize(opt.label)+'" onclick="toggleRDMSOpt(\''+id+'\',\''+valEsc+'\',event)">';
+    h+='<input type="checkbox" '+(sel?'checked':'')+' onclick="event.stopPropagation()">';
+    h+='<span>'+opt.label+'</span></div>';
+  });
+  h+='</div>';
+  h+='<div class="ms-actions"><button onclick="rdMsSelectAll(\''+id+'\',event)">Todos</button><button onclick="rdMsClear(\''+id+'\',event)">Ninguno</button></div>';
+  h+='</div>';
+  wrap.innerHTML=h;
+}
+function toggleRDMSDrop(id,e){
+  e.stopPropagation();
+  document.querySelectorAll('.ms-drop.open').forEach(d=>{if(d.id!=='ms-rd-drop-'+id)d.classList.remove('open');});
+  document.getElementById('ms-rd-drop-'+id).classList.toggle('open');
+}
+function toggleRDMSOpt(id,val,e){
+  e.stopPropagation();
+  const arr=RD_MS_STATE[id];const i=arr.indexOf(val);
+  if(i>=0)arr.splice(i,1);else arr.push(val);
+  onRDFilterChange(id,id);
+}
+function rdMsSelectAll(id,e){if(e)e.stopPropagation();RD_MS_STATE[id]=RD_MS_OPTIONS[id].map(o=>o.value);onRDFilterChange(id,id);}
+function rdMsClear(id,e){if(e)e.stopPropagation();RD_MS_STATE[id]=[];onRDFilterChange(id,id);}
+function filterRDMS(id,q){
+  const qn=normalize(q);
+  document.querySelectorAll('#ms-rd-list-'+id+' .ms-opt').forEach(el=>{
+    el.style.display=!q||el.dataset.label.includes(qn)?'flex':'none';
+  });
+}
+function onRDFilterChange(changedKey,keepOpenId){
+  if(changedKey==='oficina'||changedKey==='fase'){
+    RD_MS_OPTIONS.ejecutivo=rdEjecutivosBase().map(e=>({value:e.id,label:e.nombre+' — '+gOf(e.oficina).nombre}));
+    RD_MS_STATE.ejecutivo=RD_MS_STATE.ejecutivo.filter(id=>RD_MS_OPTIONS.ejecutivo.some(o=>o.value===id));
+  }
+  buildRDMS('oficina');buildRDMS('fase');buildRDMS('ejecutivo');
+  if(keepOpenId){const d=document.getElementById('ms-rd-drop-'+keepOpenId);if(d)d.classList.add('open');}
+  rdRenderList();
+}
+
+document.addEventListener('click',function(e){
+  document.querySelectorAll('.ms-drop.open').forEach(d=>{
+    if(!d.contains(e.target)&&!(d.previousElementSibling&&d.previousElementSibling.contains(e.target)))d.classList.remove('open');
+  });
+});
+
+function rdEjecutivosBase(){
+  return DB.ejecutivos.filter(e=>{
+    if(e.activo===false)return false;
+    if(RD_MS_STATE.oficina.length&&!RD_MS_STATE.oficina.includes(e.oficina))return false;
+    if(RD_MS_STATE.fase.length&&!RD_MS_STATE.fase.includes(e.fase||''))return false;
+    return true;
+  });
+}
+
+function rdEjecutivosFiltrados(){
+  let ejs=rdEjecutivosBase();
+  if(RD_MS_STATE.ejecutivo.length)ejs=ejs.filter(e=>RD_MS_STATE.ejecutivo.includes(e.id));
+  return ejs;
+}
+
 function initDetallado(){
   if(SESSION?.rol!=='super_admin'&&SESSION?.rol!=='admin'){
     document.getElementById('rd-content').innerHTML='<div style="padding:20px;color:var(--rd);">Acceso restringido a administradores.</div>';return;
   }
-  // Populate oficinas
-  const rdOf=document.getElementById('rd-of');
-  rdOf.innerHTML='<option value="">Todas</option>';
-  DB.oficinas.forEach(o=>rdOf.innerHTML+='<option value="'+o.id+'">'+o.nombre+'</option>');
-  // Populate fases
-  const rdFase=document.getElementById('rd-fase');
-  rdFase.innerHTML='<option value="">Todas</option>';
-  [...new Set(DB.ejecutivos.map(e=>e.fase).filter(Boolean))].sort().forEach(f=>rdFase.innerHTML+='<option value="'+f+'">'+f+'</option>');
-  // Populate meses
+  RD_MS_OPTIONS.oficina=DB.oficinas.map(o=>({value:o.id,label:o.nombre}));
+  RD_MS_OPTIONS.fase=[...new Set(DB.ejecutivos.map(e=>e.fase).filter(Boolean))].sort().map(f=>({value:f,label:f}));
+  RD_MS_OPTIONS.ejecutivo=rdEjecutivosBase().map(e=>({value:e.id,label:e.nombre+' — '+gOf(e.oficina).nombre}));
+  buildRDMS('oficina');buildRDMS('fase');buildRDMS('ejecutivo');
   const rdMes=document.getElementById('rd-mes');
+  const curMes=rdMes.value;
   rdMes.innerHTML='<option value="">Último disponible</option>';
-  [...new Set(DB.evaluaciones.map(e=>e.mes).filter(Boolean))].sort().reverse().forEach(m=>rdMes.innerHTML+='<option value="'+m+'">'+mL(m)+'</option>');
-  rdFiltrar();
+  [...new Set(DB.evaluaciones.map(e=>e.mes).filter(Boolean))].sort().reverse().forEach(m=>rdMes.innerHTML+='<option value="'+m+'"'+(m===curMes?' selected':'')+'>'+mL(m)+'</option>');
+  rdRenderList();
 }
 
-function rdFiltrar(){
-  const of=document.getElementById('rd-of').value;
-  const fase=document.getElementById('rd-fase').value;
-  const rdEj=document.getElementById('rd-ej');
-  const cur=rdEj.value;
-  let ejs=DB.ejecutivos.filter(e=>e.activo!==false);
-  if(of)ejs=ejs.filter(e=>e.oficina===of);
-  if(fase)ejs=ejs.filter(e=>e.fase===fase);
-  rdEj.innerHTML='<option value="">Selecciona un ejecutivo...</option>';
-  ejs.slice().sort((a,b)=>a.nombre.localeCompare(b.nombre)).forEach(e=>rdEj.innerHTML+='<option value="'+e.id+'"'+(e.id===cur?' selected':'')+'>'+e.nombre+' — '+gOf(e.oficina).nombre+'</option>');
-  if(cur&&ejs.find(e=>e.id===cur))rdMostrar();
-  else document.getElementById('rd-content').innerHTML='<div style="font-size:13px;color:var(--t2);text-align:center;padding:40px;">Selecciona un ejecutivo para ver su reporte detallado.</div>';
+function rdLimpiarFiltros(){
+  RD_MS_STATE.oficina=[];RD_MS_STATE.fase=[];RD_MS_STATE.ejecutivo=[];
+  document.getElementById('rd-mes').value='';
+  RD_MS_OPTIONS.ejecutivo=rdEjecutivosBase().map(e=>({value:e.id,label:e.nombre+' — '+gOf(e.oficina).nombre}));
+  buildRDMS('oficina');buildRDMS('fase');buildRDMS('ejecutivo');
+  rdRenderList();
 }
 
 function rdGetEval(ejId,mes){
@@ -4472,16 +4547,94 @@ function rdGetEval(ejId,mes){
   return evs.sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''))[0];
 }
 
-function rdMostrar(){
-  const ejId=document.getElementById('rd-ej').value;
+// ── VISTA LISTA (default: todos agrupados por oficina) ──
+function rdRenderList(){
+  const ejs=rdEjecutivosFiltrados();
   const mes=document.getElementById('rd-mes').value;
-  if(!ejId){document.getElementById('rd-content').innerHTML='<div style="font-size:13px;color:var(--t2);text-align:center;padding:40px;">Selecciona un ejecutivo.</div>';return;}
-  const ev=rdGetEval(ejId,mes||null);
-  const ej=gEj(ejId);const of=gOf(ej?.oficina);
-  if(!ev){document.getElementById('rd-content').innerHTML='<div style="font-size:13px;color:var(--t2);text-align:center;padding:40px;">Sin evaluaciones guardadas para este ejecutivo'+(mes?' en '+mL(mes):'')+'. Prueba otro mes.</div>';return;}
+  const sortBy=document.getElementById('rd-sort').value;
+
+  // Construir items con su última evaluación
+  let items=ejs.map(ej=>{
+    const ev=rdGetEval(ej.id,mes||null);
+    return{ej,ev,score:ev?ev.score:null};
+  });
+
+  // KPIs
+  const conEval=items.filter(i=>i.ev);
+  const totalEj=items.length;
+  const avgScore=conEval.length?Math.round(conEval.reduce((s,i)=>s+i.score,0)/conEval.length):0;
+  const pctSol=conEval.length?Math.round(conEval.filter(i=>i.score>80).length/conEval.length*100):0;
+  const pctAt=conEval.length?Math.round(conEval.filter(i=>i.score<50).length/conEval.length*100):0;
+  let kh='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px;">';
+  kh+='<div style="background:var(--surface);border:1px solid var(--bd);border-radius:var(--rs);padding:10px 14px;text-align:center;"><div style="font-size:22px;font-weight:500;">'+totalEj+'</div><div style="font-size:11px;color:var(--t2);">Ejecutivos en filtro</div></div>';
+  kh+='<div style="background:var(--surface);border:1px solid var(--bd);border-radius:var(--rs);padding:10px 14px;text-align:center;"><div style="font-size:22px;font-weight:500;color:'+sc(avgScore)+';">'+(conEval.length?avgScore:'—')+'</div><div style="font-size:11px;color:var(--t2);">Score promedio</div></div>';
+  kh+='<div style="background:var(--surface);border:1px solid var(--bd);border-radius:var(--rs);padding:10px 14px;text-align:center;"><div style="font-size:22px;font-weight:500;color:var(--gn);">'+pctSol+'%</div><div style="font-size:11px;color:var(--t2);">Conocimiento sólido</div></div>';
+  kh+='<div style="background:var(--surface);border:1px solid var(--bd);border-radius:var(--rs);padding:10px 14px;text-align:center;"><div style="font-size:22px;font-weight:500;color:var(--rd);">'+pctAt+'%</div><div style="font-size:11px;color:var(--t2);">Requieren atención</div></div>';
+  kh+='<div style="background:var(--surface);border:1px solid var(--bd);border-radius:var(--rs);padding:10px 14px;text-align:center;"><div style="font-size:22px;font-weight:500;">'+conEval.length+'/'+totalEj+'</div><div style="font-size:11px;color:var(--t2);">Con evaluación</div></div>';
+  kh+='</div>';
+  document.getElementById('rd-kpis').innerHTML=kh;
+
+  // Ordenar
+  if(sortBy==='score_desc')items.sort((a,b)=>(b.score||-1)-(a.score||-1));
+  else if(sortBy==='score_asc')items.sort((a,b)=>(a.score===null?999:a.score)-(b.score===null?999:b.score));
+  else if(sortBy==='nombre')items.sort((a,b)=>a.ej.nombre.localeCompare(b.ej.nombre));
+  else items.sort((a,b)=>gOf(a.ej.oficina).nombre.localeCompare(gOf(b.ej.oficina).nombre)||a.ej.nombre.localeCompare(b.ej.nombre));
+
+  if(!items.length){
+    document.getElementById('rd-content').innerHTML='<div style="font-size:13px;color:var(--t2);text-align:center;padding:40px;">Sin ejecutivos en este filtro.</div>';
+    return;
+  }
+
+  // Si es UN solo ejecutivo seleccionado vía filtro exacto: mostrar reporte completo directo
+  if(RD_MS_STATE.ejecutivo.length===1&&items.length===1){
+    document.getElementById('rd-content').innerHTML=rdBuildHeader()+rdRenderEjDetail(items[0].ej,items[0].ev);
+    return;
+  }
+
+  // Vista lista colapsable, agrupada por oficina si sortBy='oficina'
+  let h=rdBuildHeader();
+  let curOf=null;
+  items.forEach((it,idx)=>{
+    const ofNombre=gOf(it.ej.oficina).nombre;
+    if(sortBy==='oficina'&&ofNombre!==curOf){
+      curOf=ofNombre;
+      h+='<div style="font-size:12px;font-weight:600;color:var(--t2);margin:14px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--bd);">🏢 '+ofNombre+'</div>';
+    }
+    const cardId='rdcard-'+idx;
+    const scoreTxt=it.ev?it.ev.score:'—';
+    const scoreColor=it.ev?sc(it.ev.score):'var(--t3)';
+    h+='<div style="background:var(--surface);border:1px solid var(--bd);border-radius:var(--rs);margin-bottom:6px;overflow:hidden;">';
+    h+='<div onclick="rdToggleCard(\''+cardId+'\')" style="padding:10px 14px;display:flex;align-items:center;gap:10px;cursor:pointer;">';
+    h+='<span style="font-size:11px;color:var(--t3);" id="'+cardId+'-arrow">▶</span>';
+    h+='<span style="font-size:13px;font-weight:500;flex:1;">'+it.ej.nombre+'</span>';
+    h+='<span style="font-size:11px;color:var(--t3);">'+ofNombre+'</span>';
+    h+='<span style="font-size:14px;font-weight:600;color:'+scoreColor+';min-width:36px;text-align:right;">'+scoreTxt+'</span>';
+    h+='</div>';
+    h+='<div id="'+cardId+'" style="display:none;padding:0 14px 14px;border-top:1px solid var(--bd);">';
+    h+=it.ev?rdRenderEjDetail(it.ej,it.ev):'<div style="padding:14px 0;font-size:12px;color:var(--t3);">Sin evaluación guardada'+(mes?' en '+mL(mes):'')+'.</div>';
+    h+='</div></div>';
+  });
+  document.getElementById('rd-content').innerHTML=h;
+}
+
+function rdToggleCard(cardId){
+  const el=document.getElementById(cardId);
+  const arrow=document.getElementById(cardId+'-arrow');
+  if(!el)return;
+  const open=el.style.display!=='none';
+  el.style.display=open?'none':'block';
+  if(arrow)arrow.textContent=open?'▶':'▼';
+}
+
+function rdBuildHeader(){
+  return '<div id="print-header" style="display:none;font-size:12px;font-weight:600;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #ccc;">Disciplina Comercial — Reporte Detallado · '+new Date().toLocaleDateString('es-MX')+'</div>';
+}
+
+// ── DETALLE DE UN EJECUTIVO (reutilizable) ──
+function rdRenderEjDetail(ej,ev){
+  const of=gOf(ej.oficina);
   const config=getEvalConfig(ev.layout||ev.layout_id||1);
   const detalle=ev.detalle&&ev.detalle.length===config.length?ev.detalle:null;
-  // Build porCrit
   const porCrit={};
   config.forEach((p,i)=>{
     if(!porCrit[p.criterio_idx])porCrit[p.criterio_idx]={got:0,max:0,ok:[],fail:[]};
@@ -4490,13 +4643,11 @@ function rdMostrar(){
     else{const pct=(ev.criterios&&ev.criterios[p.criterio_idx])||0;porCrit[p.criterio_idx].got=Math.round((pct/100)*porCrit[p.criterio_idx].max);}
   });
   let h='';
-  // Header
-  h+='<div id="print-header" style="display:none;font-size:12px;font-weight:600;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #ccc;">Disciplina Comercial — Reporte Detallado · '+(ej?.nombre||'')+'</div>';
   h+='<div style="background:var(--surface);border:1px solid var(--bd);border-radius:var(--r);padding:16px;margin-bottom:12px;">';
   h+='<div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:8px;">';
   h+='<div><div style="font-size:11px;color:var(--t3);margin-bottom:3px;text-transform:uppercase;letter-spacing:.04em;">Reporte de evaluación</div>';
   h+='<div style="font-size:18px;font-weight:500;color:var(--t);">'+ej.nombre+'</div>';
-  h+='<div style="font-size:12px;color:var(--t2);">'+of.nombre+' · '+ej.fase+' · Evaluador: '+(ev.evaluador||'—')+'</div>';
+  h+='<div style="font-size:12px;color:var(--t2);">'+of.nombre+' · '+(ej.fase||'—')+' · Evaluador: '+(ev.evaluador||'—')+'</div>';
   h+='<div style="font-size:11px;color:var(--t3);">'+mL(ev.mes)+' · '+(ev.fecha?ev.fecha.split('T')[0]:'—')+' · Opción '+(ev.layout||ev.layout_id||'—')+'</div></div>';
   const cls=ev.score>=80?'Conocimiento sólido':ev.score>=50?'Conocimiento intermedio':'Requiere atención';
   const clsBg=ev.score>=80?'var(--gn2)':ev.score>=50?'var(--am2)':'#FEF0F0';
@@ -4505,7 +4656,6 @@ function rdMostrar(){
   h+='<div style="font-size:11px;color:var(--t2);">Score total / 100</div>';
   h+='<div style="font-size:11px;font-weight:500;margin-top:4px;padding:2px 10px;background:'+clsBg+';color:'+clsC+';border-radius:20px;display:inline-block;">'+cls+'</div></div>';
   h+='</div><div style="height:0.5px;background:var(--bd);margin:12px 0;"></div>';
-  // Global KPIs
   const totalOk=detalle?detalle.filter(Boolean).length:null;
   const totalFail=detalle?detalle.filter(v=>!v).length:null;
   h+='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">';
@@ -4519,7 +4669,6 @@ function rdMostrar(){
     h+='<div></div>';
   }
   h+='</div></div>';
-  // Tabla resumen
   h+='<div style="background:var(--surface);border:1px solid var(--bd);border-radius:var(--r);padding:14px;margin-bottom:12px;overflow-x:auto;">';
   h+='<div style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:var(--t3);margin-bottom:10px;">Resumen por criterio</div>';
   h+='<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:520px;">';
@@ -4546,7 +4695,6 @@ function rdMostrar(){
   h+='<td style="text-align:center;padding:7px 8px;"></td><td style="text-align:center;padding:7px 8px;font-size:14px;color:'+sc(ev.score)+';">'+ev.score+' / 100</td>';
   h+='<td style="padding:7px 8px;"><div style="background:var(--bg);border-radius:4px;height:7px;"><div style="background:'+sc(ev.score)+';height:7px;border-radius:4px;width:'+ev.score+'%;"></div></div></td>';
   h+='</tr></tbody></table></div>';
-  // Detalle por criterio (ordenado de menor a mayor %)
   if(detalle){
     h+='<div style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:var(--t3);margin-bottom:10px;">Detalle de preguntas por criterio</div>';
     const critOrdenados=DB.criterios.map((c,ci)=>({c,ci,pct:porCrit[ci]?Math.round((porCrit[ci].got/porCrit[ci].max)*100):0})).sort((a,b)=>a.pct-b.pct);
@@ -4575,7 +4723,6 @@ function rdMostrar(){
       h+='</div></div>';
     });
   }
-  // Análisis
   const critSorted=DB.criterios.map((c,ci)=>({nombre:c.nombre,pct:porCrit[ci]?Math.round((porCrit[ci].got/porCrit[ci].max)*100):0,fail:porCrit[ci]?.fail?.length||0})).sort((a,b)=>a.pct-b.pct);
   const fuertes=critSorted.filter(c=>c.pct>=80).reverse();
   const oport=critSorted.filter(c=>c.pct<80);
@@ -4587,71 +4734,84 @@ function rdMostrar(){
   h+='<div style="background:#FEF0F0;border-radius:var(--rs);padding:10px 12px;"><div style="font-size:11px;font-weight:500;color:var(--rd);margin-bottom:6px;">Áreas de oportunidad</div>';
   oport.slice(0,3).forEach(c=>{h+='<div style="font-size:11px;color:var(--t2);display:flex;gap:6px;margin-bottom:3px;"><span style="color:var(--rd);">✗</span>'+c.nombre+' — '+c.pct+'%'+(c.fail?' · '+c.fail+' falladas':'')+'</div>';});
   h+='</div></div>';
-  document.getElementById('rd-content').innerHTML=h;
+  return h;
 }
 
 function rdPDF(){
-  const ejId=document.getElementById('rd-ej').value;
-  if(!ejId){alert('Selecciona un ejecutivo primero');return;}
-  const ej=gEj(ejId);
+  document.querySelectorAll('#rd-content [id^="rdcard-"]').forEach(el=>el.style.display='block');
+  document.querySelectorAll('[id^="rdcard-"][id$="-arrow"]').forEach(el=>el.textContent='▼');
   document.getElementById('print-header').style.display='block';
-  document.getElementById('print-header').textContent='Disciplina Comercial — Reporte Detallado · '+(ej?.nombre||'')+' · '+new Date().toLocaleDateString('es-MX');
+  document.getElementById('print-header').textContent='Disciplina Comercial — Reporte Detallado · '+new Date().toLocaleDateString('es-MX');
   window.print();
   document.getElementById('print-header').style.display='none';
 }
 
+// ── EXCEL: BASE DE DATOS COMPLETA DEL FILTRO ACTUAL ──
 function rdExcel(){
-  const ejId=document.getElementById('rd-ej').value;
+  const ejs=rdEjecutivosFiltrados();
   const mes=document.getElementById('rd-mes').value;
-  if(!ejId){alert('Selecciona un ejecutivo primero');return;}
-  const ej=gEj(ejId);const of=gOf(ej?.oficina);
-  const ev=rdGetEval(ejId,mes||null);
-  if(!ev){alert('Sin evaluaciones para este ejecutivo');return;}
-  const config=getEvalConfig(ev.layout||ev.layout_id||1);
-  const detalle=ev.detalle&&ev.detalle.length===config.length?ev.detalle:null;
-  const porCrit={};
-  config.forEach((p,i)=>{
-    if(!porCrit[p.criterio_idx])porCrit[p.criterio_idx]={got:0,max:0,ok:[],fail:[]};
-    porCrit[p.criterio_idx].max+=p.pts;
-    if(detalle){if(detalle[i]){porCrit[p.criterio_idx].got+=p.pts;porCrit[p.criterio_idx].ok.push(p);}else porCrit[p.criterio_idx].fail.push(p);}
-    else{const pct=(ev.criterios&&ev.criterios[p.criterio_idx])||0;porCrit[p.criterio_idx].got=Math.round((pct/100)*porCrit[p.criterio_idx].max);}
-  });
+  if(!ejs.length){alert('Sin ejecutivos en el filtro actual');return;}
   const c2s=arr=>arr.map(r=>r.map(v=>'"'+String(v===null||v===undefined?'':v).replace(/"/g,'""')+'"').join(',')).join('\n');
-  // Hoja 1: Guía de calificación
-  const h1=[['GUÍA DE CALIFICACIÓN — DISCIPLINA COMERCIAL'],[''],['Cómo se compone el score'],['El score total (0-100) es la suma de puntos obtenidos en todas las preguntas.'],['Cada criterio tiene preguntas con diferente peso en puntos. El % por criterio = pts obtenidos / pts máximos del criterio.'],[''],['Criterio','# Preguntas','Puntos máximos','Peso en total','Descripción']];
+
+  // Hoja 1: Guía de calificación (genérica, usa layout 1 como referencia de pesos)
+  const config=getEvalConfig(1);
   const totalMax=config.reduce((s,p)=>s+p.pts,0);
+  const h1=[['GUÍA DE CALIFICACIÓN — DISCIPLINA COMERCIAL'],[''],['Cómo se compone el score'],['El score total (0-100) es la suma ponderada de puntos obtenidos en todas las preguntas.'],['Cada criterio tiene preguntas con diferente peso en puntos. El % por criterio = pts obtenidos / pts máximos del criterio.'],[''],['Criterio','# Preguntas','Puntos máximos','Peso en total']];
   DB.criterios.forEach((c,ci)=>{
-    const pc=porCrit[ci]||{max:0};
-    const nQ=(config.filter(p=>p.criterio_idx===ci)).length;
-    h1.push([c.nombre,nQ,pc.max,Math.round((pc.max/totalMax)*100)+'%','Ver hoja Detalle para ver preguntas']);
+    const nQ=config.filter(p=>p.criterio_idx===ci).length;
+    const pMax=config.filter(p=>p.criterio_idx===ci).reduce((s,p)=>s+p.pts,0);
+    h1.push([c.nombre,nQ,pMax,Math.round((pMax/totalMax)*100)+'%']);
   });
-  h1.push(['','','',totalMax,'100%']);
-  // Hoja 2: Resumen evaluación
-  const h2=[['Ejecutivo','Oficina','Fase','Evaluador','Mes','Fecha','Opción','Score total'],...DB.criterios.map(c=>[]).slice(0,0)];
-  const row2=[ej.nombre,of.nombre,ej.fase||'',ev.evaluador||'',mL(ev.mes),ev.fecha?ev.fecha.split('T')[0]:'',ev.layout||ev.layout_id||'',ev.score];
-  DB.criterios.forEach((c,ci)=>{
-    h2[0].push(c.nombre+' pts',c.nombre+' %');
-    const pc=porCrit[ci]||{got:0,max:0};
-    const pct=pc.max?Math.round((pc.got/pc.max)*100):0;
-    row2.push(pc.got,pct+'%');
+  h1.push(['Total','',totalMax,'100%']);
+
+  // Hoja 2: Resumen — 1 fila por ejecutivo (con o sin evaluación)
+  const h2=[['Ejecutivo','Oficina','Fase','Evaluador','Mes','Fecha','Score total','Clasificación','Delta vs anterior',...DB.criterios.flatMap(c=>[c.nombre+' pts',c.nombre+' %'])]];
+  // Hoja 3 y 4 acumulan
+  const h3=[['Ejecutivo','Oficina','Mes','Criterio','#','Pregunta','Pts posibles','Resultado','Pts obtenidos']];
+  const h4=[['Ejecutivo','Oficina','Mes','Criterio','Pregunta fallada','Pts perdidos']];
+
+  ejs.slice().sort((a,b)=>a.nombre.localeCompare(b.nombre)).forEach(ej=>{
+    const of=gOf(ej.oficina);
+    const ev=rdGetEval(ej.id,mes||null);
+    if(!ev){
+      h2.push([ej.nombre,of.nombre,ej.fase||'','','','','','Sin evaluación','',...DB.criterios.flatMap(()=>['',''])]);
+      return;
+    }
+    const cfg=getEvalConfig(ev.layout||ev.layout_id||1);
+    const detalle=ev.detalle&&ev.detalle.length===cfg.length?ev.detalle:null;
+    const porCrit={};
+    cfg.forEach((p,i)=>{
+      if(!porCrit[p.criterio_idx])porCrit[p.criterio_idx]={got:0,max:0,ok:[],fail:[]};
+      porCrit[p.criterio_idx].max+=p.pts;
+      if(detalle){if(detalle[i]){porCrit[p.criterio_idx].got+=p.pts;porCrit[p.criterio_idx].ok.push(p);}else porCrit[p.criterio_idx].fail.push(p);}
+      else{const pct=(ev.criterios&&ev.criterios[p.criterio_idx])||0;porCrit[p.criterio_idx].got=Math.round((pct/100)*porCrit[p.criterio_idx].max);}
+    });
+    // Delta vs evaluación anterior
+    const prevEvs=DB.evaluaciones.filter(e=>e.ejecutivo===ej.id&&e.guardada&&e.id!==ev.id&&(e.fecha||'')<(ev.fecha||'')).sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
+    const delta=prevEvs.length?(ev.score-prevEvs[0].score):'';
+    const cls=ev.score>=80?'Sólido':ev.score>=50?'Intermedio':'Atención';
+    const critCols=DB.criterios.flatMap((c,ci)=>{
+      const pc=porCrit[ci]||{got:0,max:0};
+      const pct=pc.max?Math.round((pc.got/pc.max)*100):0;
+      return[pc.got,pct+'%'];
+    });
+    h2.push([ej.nombre,of.nombre,ej.fase||'',ev.evaluador||'',mL(ev.mes),ev.fecha?ev.fecha.split('T')[0]:'',ev.score,cls,delta!==''?(delta>=0?'+'+delta:delta):'',...critCols]);
+
+    cfg.forEach((p,i)=>{
+      const c=DB.criterios[p.criterio_idx];
+      const ok=detalle?detalle[i]:null;
+      h3.push([ej.nombre,of.nombre,mL(ev.mes),c?c.nombre:'',i+1,p.texto,p.pts,ok===null?'Sin detalle':ok?'✓ Correcto':'✗ Incorrecto',ok?p.pts:0]);
+    });
+    DB.criterios.forEach((c,ci)=>{
+      const pc=porCrit[ci];
+      if(pc?.fail?.length)pc.fail.forEach(p=>h4.push([ej.nombre,of.nombre,mL(ev.mes),c.nombre,p.texto,p.pts]));
+    });
   });
-  h2.push(row2);
-  // Hoja 3: Detalle preguntas
-  const h3=[['Ejecutivo','Criterio','#','Pregunta','Pts posibles','Resultado','Pts obtenidos']];
-  config.forEach((p,i)=>{
-    const c=DB.criterios[p.criterio_idx];
-    const ok=detalle?detalle[i]:null;
-    h3.push([ej.nombre,c?c.nombre:'',i+1,p.texto,p.pts,ok===null?'Sin detalle':ok?'✓ Correcto':'✗ Incorrecto',ok?p.pts:0]);
-  });
-  // Hoja 4: Áreas de oportunidad
-  const h4=[['Ejecutivo','Criterio','Pregunta fallada','Pts perdidos']];
-  DB.criterios.forEach((c,ci)=>{
-    const pc=porCrit[ci];
-    if(pc?.fail?.length)pc.fail.forEach(p=>h4.push([ej.nombre,c.nombre,p.texto,p.pts]));
-  });
+
   const sep='\n\n========================================\n\n';
-  const csv='\uFEFF'+'HOJA 1: GUÍA DE CALIFICACIÓN\n'+c2s(h1)+sep+'HOJA 2: RESUMEN EVALUACIÓN\n'+c2s(h2)+sep+'HOJA 3: DETALLE POR PREGUNTA\n'+c2s(h3)+sep+'HOJA 4: ÁREAS DE OPORTUNIDAD\n'+c2s(h4);
-  descargarArchivo(csv,'Reporte_'+ej.nombre.replace(/\s+/g,'_')+'_'+mL(ev.mes)+'.csv','text/csv;charset=utf-8;');
+  const csv='\uFEFF'+'HOJA 1: GUÍA DE CALIFICACIÓN\n'+c2s(h1)+sep+'HOJA 2: RESUMEN POR EJECUTIVO\n'+c2s(h2)+sep+'HOJA 3: DETALLE POR PREGUNTA\n'+c2s(h3)+sep+'HOJA 4: ÁREAS DE OPORTUNIDAD\n'+c2s(h4);
+  const fn='Reporte_Detallado_BD_'+new Date().toISOString().split('T')[0]+'.csv';
+  descargarArchivo(csv,fn,'text/csv;charset=utf-8;');
 }
 
 // ══════════════════════════════════════════════════════════
