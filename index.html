@@ -205,10 +205,9 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFAF8;}
   .no-print, nav, .ntb-wrap, .pdf-btns, .ms-wrap, .btn-limpiar,
   #hm-of-filter, .fr, .btn, .btn-tool, .btn-p, .btn-sm,
   #print-header ~ * + .no-print { display:none!important; }
-  #vw-dashboard, #vw-evaluar, #vw-acomp, #vw-historial,
-  #vw-admin, #vw-usuarios, #vw-evolucion,
+  .vw { display:none!important; }
+  .vw.active { display:block!important; }
   .auth-screen, #auth-wrap { display:none!important; }
-  #vw-estrategico { display:block!important; }
   body, #app { background:white!important; }
   #print-header { display:block!important; font-size:12px; font-weight:600; margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid #ccc; }
 }
@@ -450,6 +449,8 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFAF8;}
           <option value="nombre">Nombre</option>
         </select></div>
       <button class="btn btn-sm" onclick="rdLimpiarFiltros()">Limpiar</button>
+      <button class="btn btn-sm" onclick="rdExpandirTodas()">⬇ Expandir todas</button>
+      <button class="btn btn-sm" onclick="rdContraerTodas()">⬆ Contraer todas</button>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
       <button class="btn btn-sm no-print" onclick="rdPDF()">📄 PDF</button>
@@ -4564,11 +4565,13 @@ function rdRenderList(){
   const totalEj=items.length;
   const avgScore=conEval.length?Math.round(conEval.reduce((s,i)=>s+i.score,0)/conEval.length):0;
   const pctSol=conEval.length?Math.round(conEval.filter(i=>i.score>80).length/conEval.length*100):0;
+  const pctInter=conEval.length?Math.round(conEval.filter(i=>i.score>=50&&i.score<=80).length/conEval.length*100):0;
   const pctAt=conEval.length?Math.round(conEval.filter(i=>i.score<50).length/conEval.length*100):0;
   let kh='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px;">';
   kh+='<div style="background:var(--surface);border:1px solid var(--bd);border-radius:var(--rs);padding:10px 14px;text-align:center;"><div style="font-size:22px;font-weight:500;">'+totalEj+'</div><div style="font-size:11px;color:var(--t2);">Ejecutivos en filtro</div></div>';
   kh+='<div style="background:var(--surface);border:1px solid var(--bd);border-radius:var(--rs);padding:10px 14px;text-align:center;"><div style="font-size:22px;font-weight:500;color:'+sc(avgScore)+';">'+(conEval.length?avgScore:'—')+'</div><div style="font-size:11px;color:var(--t2);">Score promedio</div></div>';
   kh+='<div style="background:var(--surface);border:1px solid var(--bd);border-radius:var(--rs);padding:10px 14px;text-align:center;"><div style="font-size:22px;font-weight:500;color:var(--gn);">'+pctSol+'%</div><div style="font-size:11px;color:var(--t2);">Conocimiento sólido</div></div>';
+  kh+='<div style="background:var(--surface);border:1px solid var(--bd);border-radius:var(--rs);padding:10px 14px;text-align:center;"><div style="font-size:22px;font-weight:500;color:var(--am);">'+pctInter+'%</div><div style="font-size:11px;color:var(--t2);">Conocimiento intermedio</div></div>';
   kh+='<div style="background:var(--surface);border:1px solid var(--bd);border-radius:var(--rs);padding:10px 14px;text-align:center;"><div style="font-size:22px;font-weight:500;color:var(--rd);">'+pctAt+'%</div><div style="font-size:11px;color:var(--t2);">Requieren atención</div></div>';
   kh+='<div style="background:var(--surface);border:1px solid var(--bd);border-radius:var(--rs);padding:10px 14px;text-align:center;"><div style="font-size:22px;font-weight:500;">'+conEval.length+'/'+totalEj+'</div><div style="font-size:11px;color:var(--t2);">Con evaluación</div></div>';
   kh+='</div>';
@@ -4617,6 +4620,14 @@ function rdRenderList(){
   document.getElementById('rd-content').innerHTML=h;
 }
 
+function rdExpandirTodas(){
+  document.querySelectorAll('#rd-content [id^="rdcard-"]:not([id$="-arrow"])').forEach(el=>el.style.display='block');
+  document.querySelectorAll('[id^="rdcard-"][id$="-arrow"]').forEach(el=>el.textContent='▼');
+}
+function rdContraerTodas(){
+  document.querySelectorAll('#rd-content [id^="rdcard-"]:not([id$="-arrow"])').forEach(el=>el.style.display='none');
+  document.querySelectorAll('[id^="rdcard-"][id$="-arrow"]').forEach(el=>el.textContent='▶');
+}
 function rdToggleCard(cardId){
   const el=document.getElementById(cardId);
   const arrow=document.getElementById(cardId+'-arrow');
