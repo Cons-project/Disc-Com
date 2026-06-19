@@ -4519,9 +4519,6 @@ function rdEjecutivosFiltrados(){
 }
 
 function initDetallado(){
-  if(SESSION?.rol!=='super_admin'&&SESSION?.rol!=='admin'){
-    document.getElementById('rd-content').innerHTML='<div style="padding:20px;color:var(--rd);">Acceso restringido a administradores.</div>';return;
-  }
   RD_MS_OPTIONS.oficina=DB.oficinas.map(o=>({value:o.id,label:o.nombre}));
   RD_MS_OPTIONS.fase=[...new Set(DB.ejecutivos.map(e=>e.fase).filter(Boolean))].sort().map(f=>({value:f,label:f}));
   RD_MS_OPTIONS.ejecutivo=rdEjecutivosBase().map(e=>({value:e.id,label:e.nombre+' — '+gOf(e.oficina).nombre}));
