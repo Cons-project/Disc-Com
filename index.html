@@ -6,7 +6,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Disciplina Comercial</title>
+<title>Disciplina Comercial — MVP26</title>
 <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -1772,8 +1772,11 @@ function eSelectEj(id,nombre){
   document.getElementById('eej-dropdown').style.display='none';
   lE();
 }
+// MVP26 fix: dropdown no cierra cuando se hace click en un item
 document.addEventListener('click',function(e){
-  if(e.target.id!=='eej-search'){const d=document.getElementById('eej-dropdown');if(d)d.style.display='none';}
+  const d=document.getElementById('eej-dropdown');
+  const s=document.getElementById('eej-search');
+  if(d&&!d.contains(e.target)&&e.target!==s)d.style.display='none';
 });
 function gE(ejId,mes){
   sv('evaluar');
@@ -2505,6 +2508,23 @@ function getNivelDominioConfig(){
   return NIVEL_DOMINIO_DEFAULT.map(n=>({...n}));
 }
 function setNivelDominioConfig(arr){localStorage.setItem('dc_nivel_dominio_desc',JSON.stringify(arr));}
+
+// ── MVP26: renderNivelDominioBtns (fix bug — función no definida en MVP25) ──
+let _acNivelDominio='';
+function renderNivelDominioBtns(){
+  const el=document.getElementById('nivel-dominio-btns');
+  if(!el)return;
+  const cfg=getNivelDominioConfig();
+  el.innerHTML=cfg.map(n=>{
+    const sel=_acNivelDominio===n.key;
+    return'<button onclick="acSelectNivel(\''+n.key+'\')" title="'+n.desc+'" style="font-size:11px;padding:5px 14px;border-radius:20px;border:2px solid '+(sel?n.color:'var(--bd2)')+';background:'+(sel?n.bg:'var(--surface)')+';color:'+(sel?n.color:'var(--t2)')+';cursor:pointer;transition:all .15s;font-weight:'+(sel?'600':'400')+';font-family:inherit;">'+n.label+'</button>';
+  }).join('');
+}
+function acSelectNivel(key){
+  _acNivelDominio=(_acNivelDominio===key)?'':key;
+  renderNivelDominioBtns();
+}
+
 let _acRevisado=[],_acFortalecer=[];
 
 function acToggleChip(tipo,idx){
@@ -2560,8 +2580,11 @@ function acSelectEj(id,nombre){
   document.getElementById('ac-ej').value=id;document.getElementById('ac-ej-search').value=nombre;
   document.getElementById('ac-ej-dropdown').style.display='none';acLoadPrev();
 }
+// MVP26 fix: dropdown acompañamiento no cierra cuando se hace click en un item
 document.addEventListener('click',function(e){
-  if(e.target.id!=='ac-ej-search'){const d=document.getElementById('ac-ej-dropdown');if(d)d.style.display='none';}
+  const d=document.getElementById('ac-ej-dropdown');
+  const s=document.getElementById('ac-ej-search');
+  if(d&&!d.contains(e.target)&&e.target!==s)d.style.display='none';
 });
 function acLoadPrev(){
   const ejId=document.getElementById('ac-ej').value;
