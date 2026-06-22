@@ -2621,12 +2621,19 @@ async function acGuardar(){
   if(!DB.acompañamientos)DB.acompañamientos=[];
   DB.acompañamientos.push(obj);save();
   if(USE_SUPABASE&&SB){
-    const {error}=await SB.from('acompañamientos').insert({ejecutivo_id:ejId,fecha,cumplio_anterior:hist.length?acCumplioVal:null,compromiso_anterior:prevComp,compromiso_nuevo:compromiso,notas,registrado_por:quien,temas_revisado:revisado,temas_fortalecer:fortalecer,nivel_dominio:_acNivelDominio||''});
+    // MVP26 fix: capturar UUID real de Supabase para que el borrado funcione
+    const {data:insertedData,error}=await SB.from('acompañamientos')
+      .insert({ejecutivo_id:ejId,fecha,cumplio_anterior:hist.length?acCumplioVal:null,compromiso_anterior:prevComp,compromiso_nuevo:compromiso,notas,registrado_por:quien,temas_revisado:revisado,temas_fortalecer:fortalecer,nivel_dominio:_acNivelDominio||''})
+      .select('id').single();
     if(error){
       console.error('AC save error:',error);
       if(error.message&&error.message.includes('temas')){
         alert('Error: Las columnas temas_revisado/temas_fortalecer no existen en BD.\nEjecuta migracion_mvp20_acomp.sql en Supabase primero.');
       }
+    }else if(insertedData&&insertedData.id){
+      // Actualizar id local con UUID real de Supabase
+      const localRec=DB.acompañamientos.find(a=>a.id===obj.id);
+      if(localRec){localRec.id=insertedData.id;save();}
     }
   }
   document.getElementById('ac-compromiso').value='';document.getElementById('ac-notas').value='';
