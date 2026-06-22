@@ -588,6 +588,11 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFAF8;}
       <label style="font-size:12px;color:var(--t2);display:block;margin-bottom:8px;font-weight:500;">⚠️ Se debe fortalecer</label>
       <div style="display:flex;flex-wrap:wrap;gap:6px;" id="chips-fortalecer"></div>
     </div>
+    <!-- Nivel de dominio del tablero -->
+    <div style="margin-top:12px;">
+      <label style="font-size:12px;color:var(--t2);display:block;margin-bottom:8px;font-weight:500;">📊 Nivel de dominio del tablero</label>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;" id="nivel-dominio-btns"></div>
+    </div>
     <!-- Compromisos -->
     <div style="margin-top:14px;">
       <label style="font-size:12px;color:var(--t2);display:block;margin-bottom:6px;">Compromisos</label>
@@ -629,6 +634,7 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFAF8;}
           <th style="text-align:left;padding:6px 8px;font-size:10px;color:var(--t3);font-weight:500;">EJECUTIVO</th>
           <th style="text-align:left;padding:6px 8px;font-size:10px;color:var(--t3);font-weight:500;">OFICINA</th>
           <th style="text-align:left;padding:6px 8px;font-size:10px;color:var(--t3);font-weight:500;">REGISTRADO POR</th>
+          <th style="text-align:left;padding:6px 8px;font-size:10px;color:var(--t3);font-weight:500;">NIVEL TABLERO</th>
           <th style="text-align:left;padding:6px 8px;font-size:10px;color:var(--t3);font-weight:500;">SE REVISÓ</th>
           <th style="text-align:left;padding:6px 8px;font-size:10px;color:var(--t3);font-weight:500;">A FORTALECER</th>
           <th style="text-align:left;padding:6px 8px;font-size:10px;color:var(--t3);font-weight:500;">COMPROMISOS</th>
@@ -878,6 +884,12 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFAF8;}
 </div>
 
 <!-- Administración (criterios - solo super_admin) -->
+<div class="as" id="admin-nivel-dominio-wrap" style="display:none;">
+  <div class="ash"><span class="ast">📊 Descripciones de niveles de dominio del tablero</span></div>
+  <div style="padding:12px 16px;font-size:12px;color:var(--t2);margin-bottom:8px;">Edita la descripción de cada nivel. Los cambios se guardan localmente y aplican de inmediato.</div>
+  <div id="admin-nivel-dominio-body" style="padding:0 16px 16px;display:flex;flex-direction:column;gap:8px;"></div>
+  <div style="padding:0 16px 16px;"><button class="btn btn-p btn-sm" onclick="guardarNivelDominioConfig()">Guardar descripciones</button></div>
+</div>
 <div class="vw" id="vw-admin">
   <div class="pt">Administración</div><div class="ps">Haz clic en cualquier texto para editarlo directamente</div>
   <div class="as"><div class="ash"><span class="ast">Oficinas</span><div style="display:flex;gap:8px;align-items:center;"><input class="inp" id="nueva-of" placeholder="Nombre de la oficina..." style="width:220px;" onkeydown="if(event.key==='Enter')addOf()"><button class="btn btn-sm btn-p" onclick="addOf()">+ Agregar</button></div></div><div id="adof"></div></div>
@@ -2279,9 +2291,25 @@ function rOf(){
 }
 
 function rAdmin(){
-  // Restrict criteria editing to super_admin
   const isSA=SESSION?.rol==='super_admin';
+  const isAdm=isSA||SESSION?.rol==='admin';
   document.getElementById('adcr-wrap').style.display=isSA?'':'none';
+  // Nivel dominio admin panel
+  const nivelWrap=document.getElementById('admin-nivel-dominio-wrap');
+  if(nivelWrap)nivelWrap.style.display=isAdm?'':'none';
+  if(isAdm){
+    const cfg=getNivelDominioConfig();
+    const colors=['var(--rd)','var(--am)','var(--acc)','var(--gn)'];
+    let nh='';
+    cfg.forEach((n,i)=>{
+      nh+='<div style="display:flex;align-items:center;gap:10px;background:var(--bg);border-radius:var(--rs);padding:8px 12px;border:1px solid var(--bd);">';
+      nh+='<span style="font-size:12px;font-weight:500;color:'+colors[i]+';min-width:70px;">'+n.label+'</span>';
+      nh+='<input class="inp" id="nd-desc-'+i+'" value="'+n.desc+'" style="flex:1;" placeholder="Descripción del nivel...">';
+      nh+='</div>';
+    });
+    const nb=document.getElementById('admin-nivel-dominio-body');
+    if(nb)nb.innerHTML=nh;
+  }
   let oh='';DB.oficinas.forEach(o=>{
     const ejecs=DB.ejecutivos.filter(e=>e.oficina===o.id).length;
     oh+='<div class="ai"><input class="ed" value="'+o.nombre+'" onblur="uOf(\''+o.id+'\',this.value)"><span style="font-size:12px;color:var(--t2);">'+ejecs+' ejecutivos</span><button class="btn btn-sm btn-danger" onclick="dOf(\''+o.id+'\')" '+(ejecs>0?'disabled title="No se puede eliminar: tiene ejecutivos"':'')+'>Eliminar</button></div>';
@@ -2464,6 +2492,19 @@ const AC_TEMAS=[
   'Proyección de cierre',
   'Plan de visitas'
 ];
+
+const NIVEL_DOMINIO_DEFAULT=[
+  {key:'bajo',  label:'Bajo',     color:'var(--rd)', bg:'#FEF0F0', desc:'Noción muy básica del tablero'},
+  {key:'medio', label:'Medio',    color:'var(--am)', bg:'var(--am2)', desc:'Sabe navegar y encontrar info, aplicar filtros, descargar reportes'},
+  {key:'alto',  label:'Alto',     color:'var(--acc)',bg:'var(--blue2,#E6F1FB)', desc:'Sabe detectar información estratégica dentro de los tableros'},
+  {key:'avanzado',label:'Avanzado',color:'var(--gn)',bg:'var(--gn2)', desc:'Realiza su planeación comercial basándose en cuadro de mando y tuberías'}
+];
+
+function getNivelDominioConfig(){
+  try{const v=JSON.parse(localStorage.getItem('dc_nivel_dominio_desc')||'null');if(v&&v.length===4)return v;}catch(e){}
+  return NIVEL_DOMINIO_DEFAULT.map(n=>({...n}));
+}
+function setNivelDominioConfig(arr){localStorage.setItem('dc_nivel_dominio_desc',JSON.stringify(arr));}
 let _acRevisado=[],_acFortalecer=[];
 
 function acToggleChip(tipo,idx){
@@ -2500,8 +2541,8 @@ function acInit(){
   const detOf=document.getElementById('det-of');
   if(detOf&&detOf.options.length<=1)DB.oficinas.forEach(o=>detOf.innerHTML+='<option value="'+o.id+'">'+o.nombre+'</option>');
   document.getElementById('ac-fecha').value=new Date().toISOString().split('T')[0];
-  _acRevisado=[];_acFortalecer=[];
-  initAcChips();
+  _acRevisado=[];_acFortalecer=[];_acNivelDominio='';
+  initAcChips();renderNivelDominioBtns();
   acRender();
   renderDetalle();
 }
@@ -2553,11 +2594,11 @@ async function acGuardar(){
   // Leer chips directo del DOM al momento de guardar
   const revisado=AC_TEMAS.filter((_,i)=>{const el=document.getElementById('chip-rev-'+i);return el&&el.classList.contains('chip-sel');});
   const fortalecer=AC_TEMAS.filter((_,i)=>{const el=document.getElementById('chip-for-'+i);return el&&el.classList.contains('chip-sel');});
-  const obj={id:'ac'+Date.now(),ejecutivo:ejId,fecha,cumplio_anterior:hist.length?acCumplioVal:null,compromiso_anterior:prevComp,compromiso_nuevo:compromiso,notas,registrado_por:quien,temas_revisado:revisado,temas_fortalecer:fortalecer};
+  const obj={id:'ac'+Date.now(),ejecutivo:ejId,fecha,cumplio_anterior:hist.length?acCumplioVal:null,compromiso_anterior:prevComp,compromiso_nuevo:compromiso,notas,registrado_por:quien,temas_revisado:revisado,temas_fortalecer:fortalecer,nivel_dominio:_acNivelDominio||''};
   if(!DB.acompañamientos)DB.acompañamientos=[];
   DB.acompañamientos.push(obj);save();
   if(USE_SUPABASE&&SB){
-    const {error}=await SB.from('acompañamientos').insert({ejecutivo_id:ejId,fecha,cumplio_anterior:hist.length?acCumplioVal:null,compromiso_anterior:prevComp,compromiso_nuevo:compromiso,notas,registrado_por:quien,temas_revisado:revisado,temas_fortalecer:fortalecer});
+    const {error}=await SB.from('acompañamientos').insert({ejecutivo_id:ejId,fecha,cumplio_anterior:hist.length?acCumplioVal:null,compromiso_anterior:prevComp,compromiso_nuevo:compromiso,notas,registrado_por:quien,temas_revisado:revisado,temas_fortalecer:fortalecer,nivel_dominio:_acNivelDominio||''});
     if(error){
       console.error('AC save error:',error);
       if(error.message&&error.message.includes('temas')){
@@ -2567,7 +2608,7 @@ async function acGuardar(){
   }
   document.getElementById('ac-compromiso').value='';document.getElementById('ac-notas').value='';
   document.getElementById('ac-prev-wrap').style.display='none';acCumplioVal=null;
-  _acRevisado=[];_acFortalecer=[];initAcChips();
+  _acRevisado=[];_acFortalecer=[];_acNivelDominio='';initAcChips();renderNivelDominioBtns();
   acRender();renderDetalle();
   alert('Sesión registrada correctamente');
 }
@@ -2590,11 +2631,14 @@ function renderDetalle(){
     const rev=(a.temas_revisado||[]).join(', ')||'—';
     const fort=(a.temas_fortalecer||[]).join(', ')||'—';
     const delBtn=isAdm?'<td style="padding:4px 6px;"><button class="btn btn-sm" onclick="acBorrarDetalle(\''+a.id+'\')" style="font-size:10px;padding:2px 8px;color:var(--rd);border-color:var(--rd);background:var(--rd2);" title="Borrar registro">🗑</button></td>':'<td></td>';
+    const nivelCfg=getNivelDominioConfig().find(n=>n.key===(a.nivel_dominio||''));
+    const nivelCell=nivelCfg?'<span style="font-size:11px;font-weight:500;color:'+nivelCfg.color+';background:'+nivelCfg.bg+';padding:2px 8px;border-radius:20px;">'+nivelCfg.label+'</span>':'<span style="color:var(--t3);">—</span>';
     h+='<tr style="border-bottom:0.5px solid var(--bd);">'+
       '<td style="padding:7px 8px;white-space:nowrap;font-size:12px;">'+(a.fecha||'—')+'</td>'+
       '<td style="padding:7px 8px;font-size:12px;font-weight:500;">'+(ej?ej.nombre:'—')+'</td>'+
       '<td style="padding:7px 8px;font-size:11px;color:var(--t2);">'+of.nombre+'</td>'+
       '<td style="padding:7px 8px;font-size:11px;color:var(--t2);white-space:nowrap;">'+(a.registrado_por||'—')+'</td>'+
+      '<td style="padding:7px 8px;">'+nivelCell+'</td>'+
       '<td style="padding:7px 8px;font-size:11px;color:var(--gn);max-width:160px;">'+rev+'</td>'+
       '<td style="padding:7px 8px;font-size:11px;color:var(--am);max-width:160px;">'+fort+'</td>'+
       '<td style="padding:7px 8px;font-size:11px;color:var(--t2);max-width:180px;">'+(a.compromiso_nuevo||'—')+'</td>'+
@@ -2602,7 +2646,7 @@ function renderDetalle(){
       delBtn+
       '</tr>';
   });
-  document.getElementById('det-tbody').innerHTML=h||'<tr><td colspan="9" style="padding:16px;text-align:center;color:var(--t3);font-size:12px;">Sin registros</td></tr>';
+  document.getElementById('det-tbody').innerHTML=h||'<tr><td colspan="10" style="padding:16px;text-align:center;color:var(--t3);font-size:12px;">Sin registros</td></tr>';
 }
 
 let _editEvalId=null;
@@ -2758,6 +2802,17 @@ async function guardarEditarEval(){
   alert('✓ Calificación actualizada en todos los tableros');
 }
 
+async function guardarNivelDominioConfig(){
+  const cfg=getNivelDominioConfig();
+  cfg.forEach((n,i)=>{
+    const el=document.getElementById('nd-desc-'+i);
+    if(el)n.desc=el.value.trim()||NIVEL_DOMINIO_DEFAULT[i].desc;
+  });
+  setNivelDominioConfig(cfg);
+  renderNivelDominioBtns();
+  alert('✓ Descripciones guardadas');
+}
+
 async function acBorrarDetalle(id){
   if(SESSION?.rol!=='super_admin'&&SESSION?.rol!=='admin'){alert('Solo administradores pueden borrar registros.');return;}
   if(!confirm('¿Borrar este acompañamiento? Quedará marcado como eliminado en la BD.'))return;
@@ -2769,10 +2824,11 @@ async function acBorrarDetalle(id){
 }
 function acDetCSV(){
   const rows=acDetFiltrados();
-  const hdr=['Fecha','Ejecutivo','Oficina','Registrado por','Se revisó en sesión','Se debe fortalecer','Compromisos','Comentarios'];
+  const hdr=['Fecha','Ejecutivo','Oficina','Registrado por','Nivel dominio tablero','Se revisó en sesión','Se debe fortalecer','Compromisos','Comentarios'];
   const data=[hdr,...rows.map(a=>{
     const ej=gEj(a.ejecutivo);const of=ej?gOf(ej.oficina):{nombre:''};
-    return[a.fecha||'',ej?ej.nombre:'',of.nombre,a.registrado_por||'',(a.temas_revisado||[]).join('; '),(a.temas_fortalecer||[]).join('; '),a.compromiso_nuevo||'',a.notas||''];
+    const nivelCfg=getNivelDominioConfig().find(n=>n.key===(a.nivel_dominio||''));
+    return[a.fecha||'',ej?ej.nombre:'',of.nombre,a.registrado_por||'',nivelCfg?nivelCfg.label:'',(a.temas_revisado||[]).join('; '),(a.temas_fortalecer||[]).join('; '),a.compromiso_nuevo||'',a.notas||''];
   })];
   const csv='\uFEFF'+data.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n');
   descargarArchivo(csv,'Seguimiento_Acomp_'+new Date().toISOString().split('T')[0]+'.csv','text/csv;charset=utf-8;');
@@ -2789,6 +2845,8 @@ function acDetCopiar(){
   rows.forEach(a=>{
     const ej=gEj(a.ejecutivo);const of=ej?gOf(ej.oficina):{nombre:''};
     txt+='📅 '+a.fecha+' — '+(ej?ej.nombre:'')+' ('+of.nombre+')'+(a.registrado_por?' · '+a.registrado_por:'')+'\n';
+    const nivelCfg=getNivelDominioConfig().find(n=>n.key===(a.nivel_dominio||''));
+    if(nivelCfg)txt+='📊 Nivel tablero: '+nivelCfg.label+' — '+nivelCfg.desc+'\n';
     if((a.temas_revisado||[]).length)txt+='✅ Se revisó: '+(a.temas_revisado||[]).join(', ')+'\n';
     if((a.temas_fortalecer||[]).length)txt+='⚠️ A fortalecer: '+(a.temas_fortalecer||[]).join(', ')+'\n';
     if(a.compromiso_nuevo)txt+='📌 Compromiso: '+a.compromiso_nuevo+'\n';
@@ -3052,7 +3110,7 @@ async function acLoadFromSB(){
   if(!SB)return;
   try{
     const {data}=await SB.from('acompañamientos').select('*').order('fecha',{ascending:false});
-    if(data&&data.length){DB.acompañamientos=data.filter(a=>!a.erased).map(a=>({id:a.id,ejecutivo:a.ejecutivo_id,fecha:a.fecha,cumplio_anterior:a.cumplio_anterior,compromiso_anterior:a.compromiso_anterior,compromiso_nuevo:a.compromiso_nuevo,notas:a.notas||'',registrado_por:a.registrado_por||'',temas_revisado:a.temas_revisado||[],temas_fortalecer:a.temas_fortalecer||[]}));save();}
+    if(data&&data.length){DB.acompañamientos=data.filter(a=>!a.erased).map(a=>({id:a.id,ejecutivo:a.ejecutivo_id,fecha:a.fecha,cumplio_anterior:a.cumplio_anterior,compromiso_anterior:a.compromiso_anterior,compromiso_nuevo:a.compromiso_nuevo,notas:a.notas||'',registrado_por:a.registrado_por||'',temas_revisado:a.temas_revisado||[],temas_fortalecer:a.temas_fortalecer||[],nivel_dominio:a.nivel_dominio||''}));save();}
   }catch(e){console.error('AC load:',e);}
 }
 
