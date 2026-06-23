@@ -6,7 +6,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Disciplina Comercial — MVP26</title>
+<title>Disciplina Comercial — MVP28</title>
 <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -334,6 +334,7 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFAF8;}
     <button class="chip" id="chip-evaluados" onclick="sC('evaluados')">Evaluados</button>
     <button class="chip" id="chip-pendientes" onclick="sC('pendientes')">Pendientes</button>
     <button class="chip" id="chip-truncos" onclick="sC('truncos')">Sin cerrar</button>
+    <select class="sel" id="dsubdir" onchange="rD()" style="min-width:145px;"><option value="">Todas las subdirecciones</option><option value="México Promotorias">México Promotorias</option><option value="Sur">Sur</option><option value="México Despachos">México Despachos</option></select>
     <select class="sel" id="dof" onchange="rD()"><option value="">Todas las oficinas</option></select>
     <input class="inp" placeholder="Buscar ejecutivo..." oninput="rD()" id="dq" style="width:190px">
     <button class="btn btn-p btn-sm" onclick="exportarExcel()" style="margin-left:auto;">⬇ Exportar Excel</button>
@@ -433,6 +434,8 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFAF8;}
   <div class="ph"><h1 class="pt">Reporte Detallado de Evaluación</h1><p class="pst">Desglose por criterio y pregunta · Solo admin y super admin</p></div>
   <div class="no-print">
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;">
+      <div><label style="font-size:11px;color:var(--t2);display:block;margin-bottom:4px;">Subdirección</label>
+        <div class="ms-wrap" id="ms-rd-subdir" style="min-width:145px;"></div></div>
       <div><label style="font-size:11px;color:var(--t2);display:block;margin-bottom:4px;">Oficina</label>
         <div class="ms-wrap" id="ms-rd-oficina" style="min-width:160px;"></div></div>
       <div><label style="font-size:11px;color:var(--t2);display:block;margin-bottom:4px;">Fase</label>
@@ -620,12 +623,14 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFAF8;}
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:flex-end;">
       <div><label style="font-size:11px;color:var(--t2);display:block;margin-bottom:4px;">Oficina</label>
+        <select class="sel" id="det-subdir" onchange="renderDetalle()" style="min-width:145px;"><option value="">Todas las subdirecciones</option><option value="México Promotorias">México Promotorias</option><option value="Sur">Sur</option><option value="México Despachos">México Despachos</option></select></div>
+        <div><label style="font-size:11px;color:var(--t2);">Oficina</label>
         <select class="sel" id="det-of" onchange="renderDetalle()"><option value="">Todas</option></select></div>
       <div><label style="font-size:11px;color:var(--t2);display:block;margin-bottom:4px;">Desde</label>
         <input type="date" class="inp" id="det-desde" onchange="renderDetalle()"></div>
       <div><label style="font-size:11px;color:var(--t2);display:block;margin-bottom:4px;">Hasta</label>
         <input type="date" class="inp" id="det-hasta" onchange="renderDetalle()"></div>
-      <button class="btn btn-sm" onclick="document.getElementById('det-of').value='';document.getElementById('det-desde').value='';document.getElementById('det-hasta').value='';renderDetalle()">Limpiar</button>
+      <button class="btn btn-sm" onclick="document.getElementById('det-subdir').value='';document.getElementById('det-of').value='';document.getElementById('det-desde').value='';document.getElementById('det-hasta').value='';renderDetalle()">Limpiar</button>
     </div>
     <div style="overflow-x:auto;">
       <table style="width:100%;border-collapse:collapse;font-size:12px;">
@@ -646,7 +651,8 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFAF8;}
     </div>
   </div>
   <div class="fr" style="margin-bottom:16px;">
-    <select class="sel" id="ac-of-filter" onchange="acRender()"><option value="">Todas las oficinas</option></select>
+    <select class="sel" id="ac-subdir" onchange="acRender()" style="min-width:145px;"><option value="">Todas las subdirecciones</option><option value="México Promotorias">México Promotorias</option><option value="Sur">Sur</option><option value="México Despachos">México Despachos</option></select>
+      <select class="sel" id="ac-of-filter" onchange="acRender()"><option value="">Todas las oficinas</option></select>
     <select class="sel" id="ac-fase-filter" onchange="acRender()"><option value="">Todas las fases</option></select>
     <input class="inp" placeholder="Buscar ejecutivo..." oninput="acRender()" id="ac-q" style="width:200px;">
     <button class="chip active" id="ac-chip-todos" onclick="acChip('todos')">Todos</button>
@@ -700,6 +706,8 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFAF8;}
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
       <div><label style="font-size:11px;color:var(--t2);display:block;margin-bottom:5px;">Mes</label>
         <div class="ms-wrap" id="ms-mes"></div></div>
+      <div><label style="font-size:11px;color:var(--t2);display:block;margin-bottom:5px;">Subdirección</label>
+        <div class="ms-wrap" id="ms-subdir"></div></div>
       <div><label style="font-size:11px;color:var(--t2);display:block;margin-bottom:5px;">Oficina</label>
         <div class="ms-wrap" id="ms-oficina"></div></div>
       <div><label style="font-size:11px;color:var(--t2);display:block;margin-bottom:5px;">Ejecutivo</label>
@@ -720,7 +728,8 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFAF8;}
   <!-- ─── SUB-VIEW: RESUMEN ────────────────────────────────── -->
   <div class="subview active" id="subview-resumen">
     <div id="print-header"></div>
-    <div class="sr" id="es-kpis" style="margin-bottom:16px;"></div>
+    <div class="sr" id="es-kpis" style="margin-bottom:12px;"></div>
+    <div class="sr" id="es-kpis-cobertura" style="margin-bottom:16px;background:var(--bg);border-radius:var(--rs);padding:4px 0;"></div>
     <div style="background:var(--surface);border:1px solid var(--bd);border-radius:var(--r);padding:16px;margin-bottom:16px;">
       <div style="font-size:13px;font-weight:600;color:var(--t2);margin-bottom:12px;">Promedio por criterio</div>
       <div id="es-crit-avgs" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"></div>
@@ -1499,8 +1508,8 @@ function initApp(){
 async function sbInit(){
   if(!SB)return;
   try{
-    const {data:ofs}=await SB.from('oficinas').select('id,nombre').order('nombre');
-    if(ofs&&ofs.length)DB.oficinas=ofs.map(o=>({id:o.id,nombre:o.nombre}));
+    const {data:ofs}=await SB.from('oficinas').select('id,nombre,subdireccion').order('nombre');
+    if(ofs&&ofs.length)DB.oficinas=ofs.map(o=>({id:o.id,nombre:o.nombre,subdireccion:o.subdireccion||getSubdirForOf(o.nombre)||''}));
     const {data:ejs}=await SB.from('ejecutivos').select('id,nombre,oficina_id,fase,responsable_seguimiento').eq('activo',true).order('nombre');
     if(ejs&&ejs.length)DB.ejecutivos=ejs.map(e=>({id:e.id,nombre:e.nombre,oficina:e.oficina_id,fase:e.fase||'',responsable_seguimiento:e.responsable_seguimiento||''}));
     const {data:evs}=await SB.from('evaluaciones').select('*');
@@ -1533,7 +1542,7 @@ async function sbInit(){
         });
       }
     }catch(e){console.log('Tabla app_config no disponible aún. Ejecuta migracion_mvp7_config.sql.');}
-    save();rD();lES();
+    save();refreshSubdirFilters();rD();lES();
     await acLoadFromSB();
     console.log('Supabase OK');
   }catch(e){console.error('SB error:',e);}
@@ -1567,19 +1576,38 @@ async function sbSaveEval(obj){
 }
 
 async function sbSaveOficina(id,nombre){if(!SB)return;await SB.from('oficinas').update({nombre}).eq('id',id);}
+async function sbSetOficinaSubdir(id,subdir){if(!SB)return;const o=DB.oficinas.find(of=>of.id===id);if(o)o.subdireccion=subdir;save();await SB.from('oficinas').update({subdireccion:subdir||null}).eq('id',id);refreshSubdirFilters();}
 async function sbSaveEjecutivo(id,nombre,oficina_id,fase=''){
   if(!SB)return;
   const ej=DB.ejecutivos.find(e=>e.id===id);
   const resp=ej?ej.responsable_seguimiento||'':'';
   await SB.from('ejecutivos').update({nombre,oficina_id,fase,responsable_seguimiento:resp}).eq('id',id);
 }
-async function sbAddOficina(nombre){if(!SB)return null;const {data,error}=await SB.from('oficinas').insert({nombre}).select('id').single();if(error)return null;return data.id;}
+async function sbAddOficina(nombre,subdireccion=''){if(!SB)return null;const payload={nombre};if(subdireccion)payload.subdireccion=subdireccion;const {data,error}=await SB.from('oficinas').insert(payload).select('id').single();if(error)return null;return data.id;}
 async function sbAddEjecutivo(nombre,oficina_id,fase=''){if(!SB)return null;const {data,error}=await SB.from('ejecutivos').insert({nombre,oficina_id,fase}).select('id').single();if(error)return null;return data.id;}
 
 // ══════════════════════════════════════════════════════════
 // APP LOGIC (100% original preservado)
 // ══════════════════════════════════════════════════════════
 function gOf(id){return DB.oficinas.find(o=>o.id===id)||{nombre:'?'};}
+// MVP28: reconstruir opciones de subdirección en todos los filtros simples
+function getAllSubdirOpts(){
+  const fromDB=[...new Set(DB.oficinas.map(o=>o.subdireccion).filter(Boolean))];
+  const fromMap=SUBDIRECCIONES;
+  return[...new Set([...fromMap,...fromDB])].sort();
+}
+function refreshSubdirFilters(){
+  const opts=getAllSubdirOpts();
+  const baseOpt='<option value="">Todas las subdirecciones</option>';
+  const optsHtml=opts.map(s=>'<option value="'+s+'">'+s+'</option>').join('');
+  ['dsubdir','ac-subdir','det-subdir'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(!el)return;
+    const cur=el.value;
+    el.innerHTML=baseOpt+optsHtml;
+    if(cur&&opts.includes(cur))el.value=cur;
+  });
+}
 function gEj(id){return DB.ejecutivos.find(e=>e.id===id)||{nombre:'?'};}
 // gEv: última (más reciente por fecha) evaluación guardada del ejecutivo en ese mes
 function gEv(ejId,mes){
@@ -1700,11 +1728,19 @@ function sC(v){
 function rD(){
   const mes=document.getElementById('dm').value;
   const q=(document.getElementById('dq').value||'').toLowerCase();
+  const subdirFD=document.getElementById('dsubdir')?.value||'';
   const ofS=document.getElementById('dof');
   const offF=ofS.value;
+  // MVP27: filtrar opciones de oficina por subdirección
+  const ofIdsSubdirD=getOfIdsBySubdir(subdirFD?[subdirFD]:[]);
+  const ofsFiltD=ofIdsSubdirD?DB.oficinas.filter(o=>ofIdsSubdirD.includes(o.id)):DB.oficinas;
   ofS.innerHTML='<option value="">Todas las oficinas</option>';
-  DB.oficinas.forEach(o=>ofS.innerHTML+='<option value="'+o.id+'"'+(o.id===offF?' selected':'')+'>'+o.nombre+'</option>');
-  const ejFiltrados=offF?DB.ejecutivos.filter(e=>e.oficina===offF):DB.ejecutivos;
+  ofsFiltD.forEach(o=>ofS.innerHTML+='<option value="'+o.id+'"'+(o.id===offF?' selected':'')+'>'+o.nombre+'</option>');
+  const ejFiltrados=DB.ejecutivos.filter(e=>{
+    if(offF&&e.oficina!==offF)return false;
+    if(ofIdsSubdirD&&!offF&&!ofIdsSubdirD.includes(e.oficina))return false;
+    return true;
+  });
   const ejIds=new Set(ejFiltrados.map(e=>e.id));
   const evsAll=DB.evaluaciones.filter(e=>e.mes===mes);
   const evs=evsAll.filter(e=>ejIds.has(e.ejecutivo));
@@ -1734,6 +1770,7 @@ function rD(){
   let lista=DB.ejecutivos;
   if(q)lista=lista.filter(e=>normalize(e.nombre).includes(normalize(q)));
   if(offF)lista=lista.filter(e=>e.oficina===offF);
+  else if(ofIdsSubdirD)lista=lista.filter(e=>ofIdsSubdirD.includes(e.oficina));
   if(chip==='evaluados')lista=lista.filter(e=>em[e.id]&&em[e.id].guardada);
   if(chip==='pendientes')lista=lista.filter(e=>!em[e.id]);
   if(chip==='truncos')lista=lista.filter(e=>em[e.id]&&!em[e.id].guardada);
@@ -2313,11 +2350,20 @@ function rAdmin(){
     const nb=document.getElementById('admin-nivel-dominio-body');
     if(nb)nb.innerHTML=nh;
   }
+  const subdirOptsAdmin=getAllSubdirOpts();
+  const subdirOptsHtml='<option value="">Sin asignar</option>'+subdirOptsAdmin.map(s=>'<option value="'+s+'">'+s+'</option>').join('');
   let oh='';DB.oficinas.forEach(o=>{
     const ejecs=DB.ejecutivos.filter(e=>e.oficina===o.id).length;
-    oh+='<div class="ai"><input class="ed" value="'+o.nombre+'" onblur="uOf(\''+o.id+'\',this.value)"><span style="font-size:12px;color:var(--t2);">'+ejecs+' ejecutivos</span><button class="btn btn-sm btn-danger" onclick="dOf(\''+o.id+'\')" '+(ejecs>0?'disabled title="No se puede eliminar: tiene ejecutivos"':'')+'>Eliminar</button></div>';
+    const curSubdir=o.subdireccion||'';
+    const sdOpts='<option value="">Sin asignar</option>'+subdirOptsAdmin.map(s=>'<option value="'+s+'"'+(s===curSubdir?' selected':'')+'>'+s+'</option>').join('');
+    oh+='<div class="ai" style="flex-wrap:wrap;gap:6px;">';
+    oh+='<input class="ed" value="'+o.nombre+'" onblur="uOf(\''+o.id+'\',this.value)" style="flex:2;min-width:160px;">';
+    oh+='<select class="sel" title="Subdirección" onchange="sbSetOficinaSubdir(\''+o.id+'\',this.value)" style="min-width:170px;flex:1;">'+sdOpts+'</select>';
+    oh+='<span style="font-size:12px;color:var(--t2);white-space:nowrap;">'+ejecs+' ejecutivos</span>';
+    oh+='<button class="btn btn-sm btn-danger" onclick="dOf(\''+o.id+'\''+')" '+(ejecs>0?'disabled title="No se puede eliminar: tiene ejecutivos"':'')+'>Eliminar</button>';
+    oh+='</div>';
   });
-  document.getElementById('adof').innerHTML=oh||'<div class="empty">Sin oficinas</div>';
+    document.getElementById('adof').innerHTML=oh||'<div class="empty">Sin oficinas</div>';
   let eh='';DB.ejecutivos.forEach(ej=>{eh+='<div class="ai"><input class="ed" value="'+ej.nombre+'" onblur="uEjN(\''+ej.id+'\',this.value)"><select class="sel" onchange="uEjO(\''+ej.id+'\',this.value)">'+DB.oficinas.map(o=>'<option value="'+o.id+'"'+(o.id===ej.oficina?' selected':'')+'>'+o.nombre+'</option>').join('')+'</select><input class="inp" value="'+(ej.fase||'')+'" placeholder="Fase" maxlength="30" style="width:110px;" onblur="uEjFase(\''+ej.id+'\',this.value)"><input class="inp" value="'+(ej.responsable_seguimiento||'')+'" placeholder="Responsable seguimiento" maxlength="60" style="width:180px;" onblur="uEjResp(\''+ej.id+'\',this.value)"><button class="btn btn-sm btn-danger" onclick="dEj(\''+ej.id+'\')">Eliminar</button></div>';});
   document.getElementById('adej').innerHTML=eh||'<div class="empty">Sin ejecutivos</div>';
   if(!isSA)return;
@@ -2643,7 +2689,17 @@ async function acGuardar(){
   alert('Sesión registrada correctamente');
 }
 function acDetFiltrados(){
-  const of=document.getElementById('det-of')?.value||'';
+  const subdirDet=document.getElementById('det-subdir')?.value||'';
+  const ofIdsSubdirDet=getOfIdsBySubdir(subdirDet?[subdirDet]:[]);
+  // Refrescar opciones de det-of según subdirección
+  const detOfS=document.getElementById('det-of');
+  const curDetOf=detOfS?detOfS.value:'';
+  if(detOfS){
+    const ofsFiltDet=ofIdsSubdirDet?DB.oficinas.filter(o=>ofIdsSubdirDet.includes(o.id)):DB.oficinas;
+    detOfS.innerHTML='<option value="">Todas</option>';
+    ofsFiltDet.forEach(o=>detOfS.innerHTML+='<option value="'+o.id+'"'+(o.id===curDetOf?' selected':'')+'>'+o.nombre+'</option>');
+  }
+  const of=curDetOf;
   const desde=document.getElementById('det-desde')?.value||'';
   const hasta=document.getElementById('det-hasta')?.value||'';
   let rows=(DB.acompañamientos||[]).slice();
@@ -2894,7 +2950,17 @@ function acChip(v){
   acRender();
 }
 function acRender(){
-  const of=document.getElementById('ac-of-filter').value;
+  const subdirAC=document.getElementById('ac-subdir')?.value||'';
+  const ofIdsSubdirAC=getOfIdsBySubdir(subdirAC?[subdirAC]:[]);
+  // Refrescar opciones de oficina según subdirección
+  const acOfS=document.getElementById('ac-of-filter');
+  const curAcOf=acOfS?acOfS.value:'';
+  if(acOfS){
+    const ofsFiltAC=ofIdsSubdirAC?DB.oficinas.filter(o=>ofIdsSubdirAC.includes(o.id)):DB.oficinas;
+    acOfS.innerHTML='<option value="">Todas las oficinas</option>';
+    ofsFiltAC.forEach(o=>acOfS.innerHTML+='<option value="'+o.id+'"'+(o.id===curAcOf?' selected':'')+'>'+o.nombre+'</option>');
+  }
+  const of=curAcOf;
   const faseFilter=document.getElementById('ac-fase-filter').value;
   const q=(document.getElementById('ac-q').value||'').toLowerCase();
   const now=new Date();const mesActual=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
@@ -3423,6 +3489,30 @@ async function confirmarBulkEj(){
 // MVP3 — DASHBOARD ESTRATÉGICO + MULTI-SELECT + COMPARATIVO + PDF
 // ══════════════════════════════════════════════════════════
 
+// ── MVP27: Subdirección ────────────────────────────────────
+const SUBDIR_MAP={
+  'Mexico Promotorias':['Promotorías México Centro','Promotorías México Satélite','Promotorías México Insurgentes','Toluca','Promotorías México Polanco'],
+  'Sur':['Playa del Carmen','Xalapa','Campeche','Oaxaca','Tuxtla','Villahermosa','Veracruz','Cancún','Puebla','Gobierno Sur','Mérida'],
+  'Mexico Despachos':['Cuentas Especiales','México Satélite','México Despachos Sur','Agentes y Despachos en Desarrollo','México Polanco'],
+  'Noreste':['Tuxpan','Reynosa','Tampico','Saltillo','Durango','Monterrey Promotorías','Monterrey Agentes','Torreón','Monterrey Despachos'],
+  'Noroeste':['Guasave','Mazatlán','La Paz','Obregón','Los Cabos','Tijuana','Chihuahua','Mochis','Ensenada','Chihuahua Promotorias','Ciudad Juárez','TIJUANA PROMOTORIAS','Hermosillo','Mexicali','Culiacán'],
+  'Bajio':['Pachuca','San Luis Potosí','Queretaro Despachos','Salamanca','León Promotorias','León Despachos','Irapuato','Celaya','Queretaro Promotorias','León Agentes','Querétaro Agentes'],
+  'Occidente':['Zacatecas','Aguascalientes','Morelia','Colima','Guadalajara Despachos','Zamora','Puerto Vallarta','Guadalajara Agentes','Guadalajara Promotorías']
+};
+const SUBDIRECCIONES=Object.keys(SUBDIR_MAP);
+function getSubdirForOf(ofNombre){
+  const n=normalize(ofNombre||'');
+  for(const [sd,ofs] of Object.entries(SUBDIR_MAP)){
+    if(ofs.some(o=>normalize(o)===n))return sd;
+  }
+  return null;
+}
+function getOfIdsBySubdir(subdirs){
+  if(!subdirs||!subdirs.length)return null;
+  // MVP28: lee subdireccion directamente de DB.oficinas (BD), no del SUBDIR_MAP
+  return DB.oficinas.filter(o=>subdirs.includes(o.subdireccion||'')).map(o=>o.id);
+}
+
 function getRegion(officeName){
   const n=normalize(officeName||'');
   if(/monterrey|saltillo|torreon|chihuahua|hermosillo|mexicali|tijuana|juarez/.test(n))return'Norte';
@@ -3451,8 +3541,8 @@ function mesesDelAno(){
   return out;
 }
 
-const MS_STATE={mes:[],oficina:[],ejecutivo:[],fase:[],responsable:[]};
-let ES_OPTIONS={mes:[],oficina:[],ejecutivo:[],fase:[],responsable:[]};
+const MS_STATE={mes:[],subdir:[],oficina:[],ejecutivo:[],fase:[],responsable:[]};
+let ES_OPTIONS={mes:[],subdir:[],oficina:[],ejecutivo:[],fase:[],responsable:[]};
 
 function buildMS(id,options){
   const wrap=document.getElementById('ms-'+id);if(!wrap)return;
@@ -3505,11 +3595,12 @@ document.addEventListener('click',function(e){
 function rebuildMS(keepOpenId=null){
   // Preserve search text for open dropdown before rebuild
   const searchTexts={};
-  ['mes','oficina','ejecutivo','fase','responsable'].forEach(id=>{
+  ['mes','subdir','oficina','ejecutivo','fase','responsable'].forEach(id=>{
     const inp=document.querySelector('#ms-drop-'+id+' .ms-search input');
     if(inp&&inp.value)searchTexts[id]=inp.value;
   });
   buildMS('mes',ES_OPTIONS.mes);
+  buildMS('subdir',ES_OPTIONS.subdir);
   buildMS('oficina',ES_OPTIONS.oficina);
   buildMS('ejecutivo',ES_OPTIONS.ejecutivo);
   buildMS('fase',ES_OPTIONS.fase);
@@ -3530,6 +3621,7 @@ function rebuildMS(keepOpenId=null){
 function renderChips(){
   let h='';
   Object.entries(MS_STATE).forEach(([k,vals])=>{
+    if(!ES_OPTIONS[k])return; // skip if no options defined for key
     vals.forEach(v=>{
       const opt=ES_OPTIONS[k].find(o=>o.value===v);
       const lbl=opt?opt.label:v;
@@ -3541,7 +3633,7 @@ function renderChips(){
 function removeChip(k,v){const arr=MS_STATE[k];const i=arr.indexOf(v);if(i>=0)arr.splice(i,1);onEsFilterChange(k,null);}
 
 function onEsFilterChange(changedKey,keepOpenId=null){
-  if(changedKey==='oficina'||changedKey==='fase'||changedKey==='responsable'){
+  if(changedKey==='subdir'||changedKey==='oficina'||changedKey==='fase'||changedKey==='responsable'){
     updateEjecutivoOptions();
   }
   rebuildMS(keepOpenId);
@@ -3550,15 +3642,25 @@ function onEsFilterChange(changedKey,keepOpenId=null){
 }
 
 function updateEjecutivoOptions(){
+  // MVP27: filtrar opciones de oficina según subdirección seleccionada
+  const ofIdsSubdirES=getOfIdsBySubdir(MS_STATE.subdir);
+  let ofOptsES=DB.oficinas.slice().sort((a,b)=>a.nombre.localeCompare(b.nombre));
+  if(ofIdsSubdirES){
+    ofOptsES=ofOptsES.filter(o=>ofIdsSubdirES.includes(o.id));
+    MS_STATE.oficina=MS_STATE.oficina.filter(v=>ofIdsSubdirES.includes(v));
+  }
+  ES_OPTIONS.oficina=ofOptsES.map(o=>({value:o.id,label:o.nombre}));
   ES_OPTIONS.ejecutivo=ejecutivosBaseDeFiltros().map(e=>({value:e.id,label:e.nombre+' — '+gOf(e.oficina).nombre})).sort((a,b)=>a.label.localeCompare(b.label));
   const valid=new Set(ES_OPTIONS.ejecutivo.map(o=>o.value));
   MS_STATE.ejecutivo=MS_STATE.ejecutivo.filter(v=>valid.has(v));
 }
 
 function ejecutivosBaseDeFiltros(){
+  const ofIdsSubdirEBF=getOfIdsBySubdir(MS_STATE.subdir);
   return DB.ejecutivos.filter(e=>{
     if(e.activo===false)return false;
-    if(MS_STATE.oficina.length&&!MS_STATE.oficina.includes(e.oficina))return false;
+    if(MS_STATE.oficina.length){if(!MS_STATE.oficina.includes(e.oficina))return false;}
+    else if(ofIdsSubdirEBF){if(!ofIdsSubdirEBF.includes(e.oficina))return false;}
     if(MS_STATE.fase.length&&!MS_STATE.fase.includes(e.fase||''))return false;
     if(MS_STATE.responsable.length&&!MS_STATE.responsable.includes(e.responsable_seguimiento||''))return false;
     return true;
@@ -3572,7 +3674,7 @@ function ejecutivosFiltrados(){
 }
 
 function clearEsFilters(){
-  MS_STATE.mes=[];MS_STATE.oficina=[];MS_STATE.ejecutivo=[];MS_STATE.fase=[];MS_STATE.responsable=[];
+  MS_STATE.mes=[];MS_STATE.subdir=[];MS_STATE.oficina=[];MS_STATE.ejecutivo=[];MS_STATE.fase=[];MS_STATE.responsable=[];
   updateEjecutivoOptions();rebuildMS(null);rEstrategico();rEvoChart();
   if(document.getElementById('subview-comparativo').classList.contains('active'))rComparativo();
 }
@@ -3585,6 +3687,7 @@ function initEstrategico(){
     const _now=new Date();const cur=_now.getFullYear()+'-'+String(_now.getMonth()+1).padStart(2,'0');
     MS_STATE.mes=[cur];
   }
+  ES_OPTIONS.subdir=getAllSubdirOpts().map(s=>({value:s,label:s}));
   ES_OPTIONS.oficina=DB.oficinas.slice().sort((a,b)=>a.nombre.localeCompare(b.nombre)).map(o=>({value:o.id,label:o.nombre}));
   const fases=[...new Set(DB.ejecutivos.map(e=>e.fase).filter(Boolean))].sort();
   ES_OPTIONS.fase=fases.length?fases.map(f=>({value:f,label:f})):[];
@@ -3692,6 +3795,21 @@ function rEstrategico(){
   }
   document.getElementById('es-top').innerHTML=top.length?top.map((e,i)=>rowHtml(e,i)).join(''):'<tr><td colspan="5" class="empty">Sin datos</td></tr>';
   document.getElementById('es-bottom').innerHTML=bot.length?bot.map((e,i)=>rowHtml(e,i)).join(''):'<tr><td colspan="5" class="empty">Sin datos</td></tr>';
+  // ── MVP27: KPIs de Cobertura (nueva fila) ──────────────────
+  const acompsAll=(DB.acompañamientos||[]).filter(a=>!a.erased);
+  const ejsConAcompSet=new Set(acompsAll.filter(a=>ejIds.has(a.ejecutivo)).map(a=>a.ejecutivo));
+  const ejsConEvalSet=ejsEval; // ya calculado arriba
+  const ejsConAlgunoSet=new Set([...ejsConEvalSet,...ejsConAcompSet]);
+  const cobTotal=total?Math.round(ejsConAlgunoSet.size/total*100):0;
+  const pctEvalCob=total?Math.round(ejsConEvalSet.size/total*100):0;
+  const pctAcompCob=total?Math.round(ejsConAcompSet.size/total*100):0;
+  const cobEl=document.getElementById('es-kpis-cobertura');
+  if(cobEl){
+    cobEl.innerHTML=
+      '<div class="sc" style="background:var(--pu2);border-color:var(--pu);" title="Ejecutivos con al menos 1 evaluación O 1 acompañamiento"><div style="font-size:10px;font-weight:700;color:var(--pu);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Cobertura total</div><div class="sv" style="color:var(--pu);">'+cobTotal+'%</div><div style="font-size:10px;color:var(--t3);margin-top:2px;">'+ejsConAlgunoSet.size+' de '+total+'</div></div>'+
+      '<div class="sc" style="background:var(--blue2,#E6F1FB);border-color:var(--acc);" title="Ejecutivos con al menos 1 evaluación guardada en el periodo"><div style="font-size:10px;font-weight:700;color:var(--acc);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Evaluados</div><div class="sv" style="color:var(--acc);">'+pctEvalCob+'%</div><div style="font-size:10px;color:var(--t3);margin-top:2px;">'+ejsConEvalSet.size+' de '+total+'</div></div>'+
+      '<div class="sc" style="background:var(--am2);border-color:var(--am);" title="Ejecutivos con al menos 1 acompañamiento (histórico completo, sin filtro de mes)"><div style="font-size:10px;font-weight:700;color:var(--am);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Acompañados</div><div class="sv" style="color:var(--am);">'+pctAcompCob+'%</div><div style="font-size:10px;color:var(--t3);margin-top:2px;">'+ejsConAcompSet.size+' de '+total+' · histórico</div></div>';
+  }
   renderHeatmap(ejs,evs);
 }
 
@@ -4530,8 +4648,8 @@ if(_origRAdmin){
 // ══════════════════════════════════════════════════════════
 // REPORTE DETALLADO
 // ══════════════════════════════════════════════════════════
-const RD_MS_STATE={oficina:[],fase:[],ejecutivo:[]};
-const RD_MS_OPTIONS={oficina:[],fase:[],ejecutivo:[]};
+const RD_MS_STATE={subdir:[],oficina:[],fase:[],ejecutivo:[]};
+const RD_MS_OPTIONS={subdir:[],oficina:[],fase:[],ejecutivo:[]};
 
 function buildRDMS(id){
   const wrap=document.getElementById('ms-rd-'+id);if(!wrap)return;
@@ -4576,11 +4694,19 @@ function filterRDMS(id,q){
   });
 }
 function onRDFilterChange(changedKey,keepOpenId){
-  if(changedKey==='oficina'||changedKey==='fase'){
+  if(changedKey==='subdir'||changedKey==='oficina'||changedKey==='fase'){
+    // MVP27: filtrar opciones de oficina por subdir
+    const ofIdsSubdirRD=getOfIdsBySubdir(RD_MS_STATE.subdir);
+    let ofOptsRD=DB.oficinas.slice().sort((a,b)=>a.nombre.localeCompare(b.nombre));
+    if(ofIdsSubdirRD){
+      ofOptsRD=ofOptsRD.filter(o=>ofIdsSubdirRD.includes(o.id));
+      RD_MS_STATE.oficina=RD_MS_STATE.oficina.filter(v=>ofIdsSubdirRD.includes(v));
+    }
+    RD_MS_OPTIONS.oficina=ofOptsRD.map(o=>({value:o.id,label:o.nombre}));
     RD_MS_OPTIONS.ejecutivo=rdEjecutivosBase().map(e=>({value:e.id,label:e.nombre+' — '+gOf(e.oficina).nombre}));
     RD_MS_STATE.ejecutivo=RD_MS_STATE.ejecutivo.filter(id=>RD_MS_OPTIONS.ejecutivo.some(o=>o.value===id));
   }
-  buildRDMS('oficina');buildRDMS('fase');buildRDMS('ejecutivo');
+  buildRDMS('subdir');buildRDMS('oficina');buildRDMS('fase');buildRDMS('ejecutivo');
   if(keepOpenId){const d=document.getElementById('ms-rd-drop-'+keepOpenId);if(d)d.classList.add('open');}
   rdRenderList();
 }
@@ -4592,9 +4718,11 @@ document.addEventListener('click',function(e){
 });
 
 function rdEjecutivosBase(){
+  const ofIdsSubdirRDB=getOfIdsBySubdir(RD_MS_STATE.subdir);
   return DB.ejecutivos.filter(e=>{
     if(e.activo===false)return false;
-    if(RD_MS_STATE.oficina.length&&!RD_MS_STATE.oficina.includes(e.oficina))return false;
+    if(RD_MS_STATE.oficina.length){if(!RD_MS_STATE.oficina.includes(e.oficina))return false;}
+    else if(ofIdsSubdirRDB){if(!ofIdsSubdirRDB.includes(e.oficina))return false;}
     if(RD_MS_STATE.fase.length&&!RD_MS_STATE.fase.includes(e.fase||''))return false;
     return true;
   });
@@ -4607,10 +4735,11 @@ function rdEjecutivosFiltrados(){
 }
 
 function initDetallado(){
+  RD_MS_OPTIONS.subdir=getAllSubdirOpts().map(s=>({value:s,label:s}));
   RD_MS_OPTIONS.oficina=DB.oficinas.map(o=>({value:o.id,label:o.nombre}));
   RD_MS_OPTIONS.fase=[...new Set(DB.ejecutivos.map(e=>e.fase).filter(Boolean))].sort().map(f=>({value:f,label:f}));
   RD_MS_OPTIONS.ejecutivo=rdEjecutivosBase().map(e=>({value:e.id,label:e.nombre+' — '+gOf(e.oficina).nombre}));
-  buildRDMS('oficina');buildRDMS('fase');buildRDMS('ejecutivo');
+  buildRDMS('subdir');buildRDMS('oficina');buildRDMS('fase');buildRDMS('ejecutivo');
   const rdMes=document.getElementById('rd-mes');
   const curMes=rdMes.value;
   rdMes.innerHTML='<option value="">Último disponible</option>';
@@ -4619,10 +4748,11 @@ function initDetallado(){
 }
 
 function rdLimpiarFiltros(){
-  RD_MS_STATE.oficina=[];RD_MS_STATE.fase=[];RD_MS_STATE.ejecutivo=[];
+  RD_MS_STATE.subdir=[];RD_MS_STATE.oficina=[];RD_MS_STATE.fase=[];RD_MS_STATE.ejecutivo=[];
   document.getElementById('rd-mes').value='';
+  RD_MS_OPTIONS.oficina=DB.oficinas.map(o=>({value:o.id,label:o.nombre}));
   RD_MS_OPTIONS.ejecutivo=rdEjecutivosBase().map(e=>({value:e.id,label:e.nombre+' — '+gOf(e.oficina).nombre}));
-  buildRDMS('oficina');buildRDMS('fase');buildRDMS('ejecutivo');
+  buildRDMS('subdir');buildRDMS('oficina');buildRDMS('fase');buildRDMS('ejecutivo');
   rdRenderList();
 }
 
