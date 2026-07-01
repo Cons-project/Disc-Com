@@ -6,7 +6,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Disciplina Comercial — MVP28</title>
+<title>Disciplina Comercial — MVP29</title>
 <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -3748,7 +3748,6 @@ function rEstrategico(){
   const arrow=delta>0?'<span style="color:var(--gn);">↑ +'+delta+'</span>':delta<0?'<span style="color:var(--rd);">↓ '+delta+'</span>':'<span style="color:var(--t3);">→ 0</span>';
 
   document.getElementById('es-kpis').innerHTML=
-    '<div class="sc"><div class="sv">'+cob+'%</div><div class="sl">Cobertura</div><div style="font-size:10px;color:var(--t3);margin-top:3px;">'+evd+' de '+total+'</div></div>'+
     '<div class="sc'+(avg>=80?' g':avg>=60?' a':avg>0?' r':'')+'" ><div class="sv">'+(avg||'—')+'</div><div class="sl">Score · '+periodoLabel+'</div><div style="font-size:10px;margin-top:3px;">'+arrow+'</div></div>'+
     '<div class="sc g"><div class="sv">'+pctSol+'%</div><div class="sl">Conocimiento sólido</div><div style="font-size:10px;color:var(--t3);margin-top:3px;">'+sol+' ejec. (>80 pts)</div></div>'+
     '<div class="sc a"><div class="sv">'+pctInter+'%</div><div class="sl">Conocimiento intermedio</div><div style="font-size:10px;color:var(--t3);margin-top:3px;">'+inter+' ejec. (50–80 pts)</div></div>'+
@@ -3796,9 +3795,11 @@ function rEstrategico(){
   document.getElementById('es-top').innerHTML=top.length?top.map((e,i)=>rowHtml(e,i)).join(''):'<tr><td colspan="5" class="empty">Sin datos</td></tr>';
   document.getElementById('es-bottom').innerHTML=bot.length?bot.map((e,i)=>rowHtml(e,i)).join(''):'<tr><td colspan="5" class="empty">Sin datos</td></tr>';
   // ── MVP27: KPIs de Cobertura (nueva fila) ──────────────────
+  // MVP29 fix: histórico completo — no filtrar por mes
   const acompsAll=(DB.acompañamientos||[]).filter(a=>!a.erased);
-  const ejsConAcompSet=new Set(acompsAll.filter(a=>ejIds.has(a.ejecutivo)).map(a=>a.ejecutivo));
-  const ejsConEvalSet=ejsEval; // ya calculado arriba
+  const evsHistorico=DB.evaluaciones.filter(e=>e.guardada&&e.score!==null&&ejIds.has(e.ejecutivo));
+  const ejsConEvalSet=new Set(evsHistorico.map(e=>e.ejecutivo));
+  const ejsConAcompSet=new Set(acompsAll.filter(a=>ejIds.has(a.ejecutivo)).map(a=>a.ejecutivo))
   const ejsConAlgunoSet=new Set([...ejsConEvalSet,...ejsConAcompSet]);
   const cobTotal=total?Math.round(ejsConAlgunoSet.size/total*100):0;
   const pctEvalCob=total?Math.round(ejsConEvalSet.size/total*100):0;
@@ -3807,7 +3808,7 @@ function rEstrategico(){
   if(cobEl){
     cobEl.innerHTML=
       '<div class="sc" style="background:var(--pu2);border-color:var(--pu);" title="Ejecutivos con al menos 1 evaluación O 1 acompañamiento"><div style="font-size:10px;font-weight:700;color:var(--pu);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Cobertura total</div><div class="sv" style="color:var(--pu);">'+cobTotal+'%</div><div style="font-size:10px;color:var(--t3);margin-top:2px;">'+ejsConAlgunoSet.size+' de '+total+'</div></div>'+
-      '<div class="sc" style="background:var(--blue2,#E6F1FB);border-color:var(--acc);" title="Ejecutivos con al menos 1 evaluación guardada en el periodo"><div style="font-size:10px;font-weight:700;color:var(--acc);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Evaluados</div><div class="sv" style="color:var(--acc);">'+pctEvalCob+'%</div><div style="font-size:10px;color:var(--t3);margin-top:2px;">'+ejsConEvalSet.size+' de '+total+'</div></div>'+
+      '<div class="sc" style="background:var(--blue2,#E6F1FB);border-color:var(--acc);" title="Ejecutivos con al menos 1 evaluación guardada · histórico completo"><div style="font-size:10px;font-weight:700;color:var(--acc);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Evaluados</div><div class="sv" style="color:var(--acc);">'+pctEvalCob+'%</div><div style="font-size:10px;color:var(--t3);margin-top:2px;">'+ejsConEvalSet.size+' de '+total+'</div></div>'+
       '<div class="sc" style="background:var(--am2);border-color:var(--am);" title="Ejecutivos con al menos 1 acompañamiento (histórico completo, sin filtro de mes)"><div style="font-size:10px;font-weight:700;color:var(--am);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Acompañados</div><div class="sv" style="color:var(--am);">'+pctAcompCob+'%</div><div style="font-size:10px;color:var(--t3);margin-top:2px;">'+ejsConAcompSet.size+' de '+total+' · histórico</div></div>';
   }
   renderHeatmap(ejs,evs);
