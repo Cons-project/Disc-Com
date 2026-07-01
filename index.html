@@ -6,7 +6,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Disciplina Comercial — MVP29</title>
+<title>Disciplina Comercial — MVP32</title>
 <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -53,6 +53,14 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--t);font-s
 .nu-role.sa{background:#1A1916;color:#fff;}
 .logout-btn{padding:5px 12px;border-radius:6px;border:1px solid var(--bd2);background:transparent;font-family:inherit;font-size:12px;color:var(--t2);cursor:pointer;}
 .logout-btn:hover{background:var(--rd2);color:var(--rd);border-color:var(--rd);}
+/* MVP32: dropdown nav */
+.ntb-more-wrap{position:relative;}
+.ntb-more-drop{display:none;position:absolute;top:calc(100% + 8px);right:0;background:var(--surface);border:1px solid var(--bd);border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,.10);min-width:210px;padding:4px;z-index:300;}
+.ntb-more-drop.open{display:block;}
+.ntb-more-item{display:block;width:100%;padding:8px 14px;border-radius:6px;border:none;background:transparent;color:var(--t2);font-family:inherit;font-size:13px;cursor:pointer;text-align:left;transition:all .15s;white-space:nowrap;}
+.ntb-more-item:hover{background:var(--s2);color:var(--t);}
+.ntb-more-item.active{background:var(--acc);color:#fff;}
+#nb-more-btn.has-active{background:var(--s2);color:var(--acc);border:1px solid var(--acc);}
 
 /* ── VIEWS ────────────────────────────────────────────────── */
 .vw{display:none;padding:24px 20px;max-width:1100px;margin:0 auto;}
@@ -305,14 +313,20 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:#FAFAF8;}
   <div class="nt">
     <button class="ntb active" id="nb-dashboard" onclick="sv('dashboard')">🏠 Home</button>
     <button class="ntb" id="nb-evaluar" onclick="sv('evaluar')">Evaluar</button>
-    <button class="ntb" id="nb-evolución" onclick="sv('evolución')">Evolución</button>
-    <button class="ntb" id="nb-oficinas" onclick="sv('oficinas')">Por oficina</button>
     <button class="ntb" id="nb-acomp" onclick="sv('acomp')">Acompañamiento</button>
     <button class="ntb" id="nb-estrategico" onclick="sv('estrategico')">📊 Reporte Estratégico</button>
-    <button class="ntb" id="nb-detallado" onclick="sv('detallado')">📋 Reporte Detallado</button>
-    <button class="ntb" id="nb-agil" onclick="sv('agil')">⚡ Eval. Ágil</button>
-    <button class="ntb" id="nb-admin" onclick="sv('admin')">Administración</button>
-    <button class="ntb" id="nb-usuarios" onclick="sv('usuarios')" style="display:none;">Usuarios</button>
+    <div class="ntb-more-wrap" id="ntb-more-wrap">
+      <button class="ntb" id="nb-more-btn" onclick="toggleNavMore(event)">Más opciones ▾</button>
+      <div class="ntb-more-drop" id="ntb-more-drop">
+        <button class="ntb-more-item" id="nb-evolución" onclick="sv('evolución')">📈 Evolución</button>
+        <button class="ntb-more-item" id="nb-oficinas" onclick="sv('oficinas')">🏢 Por oficina</button>
+        <button class="ntb-more-item" id="nb-detallado" onclick="sv('detallado')">📋 Reporte Detallado</button>
+        <button class="ntb-more-item" id="nb-agil" onclick="sv('agil')">⚡ Eval. Ágil</button>
+        <div style="height:1px;background:var(--bd);margin:4px 8px;"></div>
+        <button class="ntb-more-item" id="nb-admin" onclick="sv('admin')">⚙️ Administración</button>
+        <button class="ntb-more-item" id="nb-usuarios" onclick="sv('usuarios')" style="display:none;">👥 Usuarios</button>
+      </div>
+    </div>
   </div>
   <div class="nu">
     <button class="btn btn-sm" onclick="refreshAll()" id="btn-refresh" title="Recargar datos de la BD y refrescar todas las pestañas" style="background:var(--acc);color:#fff;">↻ Actualizar</button>
@@ -1629,6 +1643,16 @@ function sBd(s){
   return'<span class="badge br">'+s+' - Atención</span>';
 }
 
+// MVP32: toggle dropdown nav
+function toggleNavMore(e){
+  e.stopPropagation();
+  document.getElementById('ntb-more-drop').classList.toggle('open');
+}
+document.addEventListener('click',function(e){
+  const w=document.getElementById('ntb-more-wrap');
+  if(w&&!w.contains(e.target))document.getElementById('ntb-more-drop')?.classList.remove('open');
+});
+
 function sv(id){
   // Guards: admin-only sections
   if((id==='admin'||id==='usuarios')&&SESSION?.rol!=='super_admin'){
@@ -1636,9 +1660,17 @@ function sv(id){
     id='dashboard';
   }
   document.querySelectorAll('.vw').forEach(v=>v.classList.remove('active'));
-  document.querySelectorAll('.ntb').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.ntb,.ntb-more-item').forEach(t=>t.classList.remove('active'));
+  document.getElementById('nb-more-btn')?.classList.remove('has-active');
+  document.getElementById('ntb-more-drop')?.classList.remove('open');
   document.getElementById('vw-'+id).classList.add('active');
-  document.querySelectorAll('.ntb').forEach(t=>{if(t.getAttribute('onclick')&&t.getAttribute('onclick').includes("'"+id+"'"))t.classList.add('active');});
+  // MVP32: marcar activo en nav principal o en dropdown
+  const target=document.getElementById('nb-'+id);
+  if(target){
+    target.classList.add('active');
+    if(target.classList.contains('ntb-more-item'))
+      document.getElementById('nb-more-btn')?.classList.add('has-active');
+  }
   if(id==='dashboard')rD();
   if(id==='evolución'||id==='evolucion')rEvo();
   if(id==='oficinas')rOf();
