@@ -43,7 +43,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--t);font-s
 /* ── MAIN NAV ─────────────────────────────────────────────── */
 .nav{background:var(--surface);border-bottom:1px solid var(--bd);padding:0 20px;display:flex;align-items:center;justify-content:space-between;height:52px;position:sticky;top:0;z-index:100;}
 .nb{font-size:15px;font-weight:600;letter-spacing:-.3px;flex-shrink:0;}.nb span{color:var(--t3);font-weight:400;}
-.nt{display:flex;gap:2px;overflow-x:auto;}
+.nt{display:flex;gap:2px;overflow:visible;}
 .ntb{padding:5px 12px;border-radius:6px;border:none;background:transparent;color:var(--t2);font-family:inherit;font-size:13px;cursor:pointer;transition:all .15s;white-space:nowrap;}
 .ntb:hover{background:var(--s2);color:var(--t);}
 .ntb.active{background:var(--acc);color:#fff;}
@@ -55,7 +55,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--t);font-s
 .logout-btn:hover{background:var(--rd2);color:var(--rd);border-color:var(--rd);}
 /* MVP32: dropdown nav */
 .ntb-more-wrap{position:relative;}
-.ntb-more-drop{display:none;position:absolute;top:calc(100% + 8px);right:0;background:var(--surface);border:1px solid var(--bd);border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,.10);min-width:210px;padding:4px;z-index:300;}
+.ntb-more-drop{display:none;position:fixed;top:52px;right:auto;background:var(--surface);border:1px solid var(--bd);border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,.10);min-width:210px;padding:4px;z-index:9999;}
 .ntb-more-drop.open{display:block;}
 .ntb-more-item{display:block;width:100%;padding:8px 14px;border-radius:6px;border:none;background:transparent;color:var(--t2);font-family:inherit;font-size:13px;cursor:pointer;text-align:left;transition:all .15s;white-space:nowrap;}
 .ntb-more-item:hover{background:var(--s2);color:var(--t);}
@@ -1646,7 +1646,14 @@ function sBd(s){
 // MVP32: toggle dropdown nav
 function toggleNavMore(e){
   e.stopPropagation();
-  document.getElementById('ntb-more-drop').classList.toggle('open');
+  const drop=document.getElementById('ntb-more-drop');
+  const btn=document.getElementById('nb-more-btn');
+  if(drop.classList.contains('open')){drop.classList.remove('open');return;}
+  // Posicionar bajo el botón
+  const rect=btn.getBoundingClientRect();
+  drop.style.left=(rect.right-210)+'px';
+  drop.style.top=rect.bottom+4+'px';
+  drop.classList.add('open');
 }
 document.addEventListener('click',function(e){
   const w=document.getElementById('ntb-more-wrap');
